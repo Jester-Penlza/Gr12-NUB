@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 650" role="img" aria-labelledby="title desc">
+  <title id="title">School T-Shirt image placeholder</title><desc id="desc">Replace this file with the real School T-Shirt product photograph.</desc>
+  <defs><linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#eaf1ff"/><stop offset="1" stop-color="#d5e4f8"/></linearGradient><filter id="s"><feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#0b1f3a" flood-opacity=".16"/></filter></defs>
+  <rect width="800" height="650" fill="url(#bg)"/><circle cx="675" cy="95" r="112" fill="#f4bd45" opacity=".34"/><circle cx="110" cy="530" r="140" fill="#175cd3" opacity=".08"/>
+  <g filter="url(#s)"><path d="M300 145l68-31h64l68 31 110 80-58 92-57-39v234H305V278l-57 39-58-92z" fill="#f8fbff" stroke="#b8c9df" stroke-width="5"/><path d="M365 116q35 55 70 0" fill="none" stroke="#173b68" stroke-width="16"/><circle cx="400" cy="309" r="56" fill="#173b68"/><text x="400" y="328" text-anchor="middle" font-family="Arial, sans-serif" font-size="52" font-weight="900" fill="#f4bd45">C</text></g>
+  <rect x="224" y="548" width="352" height="56" rx="28" fill="#fff" opacity=".94"/><text x="400" y="571" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="700" fill="#175cd3" letter-spacing="2">PRODUCT IMAGE PLACEHOLDER</text><text x="400" y="590" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" fill="#667085">SCHOOL T-SHIRT</text>
+</svg>

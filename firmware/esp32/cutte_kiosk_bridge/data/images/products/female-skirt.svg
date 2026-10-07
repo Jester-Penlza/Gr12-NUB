@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 650" role="img" aria-labelledby="title desc">
+  <title id="title">Female Skirt image placeholder</title><desc id="desc">Replace this file with the real Female Skirt product photograph.</desc>
+  <defs><linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#f0f5fc"/><stop offset="1" stop-color="#dbe7f7"/></linearGradient><filter id="s"><feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#0b1f3a" flood-opacity=".16"/></filter></defs>
+  <rect width="800" height="650" fill="url(#bg)"/><circle cx="125" cy="120" r="108" fill="#f4bd45" opacity=".3"/><circle cx="675" cy="500" r="125" fill="#175cd3" opacity=".08"/>
+  <g filter="url(#s)"><path d="M315 130h170l70 382H245z" fill="#173b68"/><path d="M305 130h190v58H305z" fill="#244f82"/><path d="M340 188l-28 284M400 188v310M460 188l28 284" stroke="#6b8fb8" stroke-width="5"/></g>
+  <rect x="224" y="548" width="352" height="56" rx="28" fill="#fff" opacity=".94"/><text x="400" y="571" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="700" fill="#175cd3" letter-spacing="2">PRODUCT IMAGE PLACEHOLDER</text><text x="400" y="590" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" fill="#667085">FEMALE SKIRT</text>
+</svg>

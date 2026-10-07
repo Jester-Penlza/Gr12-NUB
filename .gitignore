@@ -1,0 +1,11 @@
+node_modules/
+dist/
+tmp/
+output/
+graphify-out/
+.graphify-venv/
+.codex/
+__pycache__/
+*.pyc
+websites-master/
+websites-master.zip
