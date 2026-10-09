@@ -1,0 +1,54 @@
+You are taking over the UNIVUE project for NU Baliwag Bulldogs Exchange.
+
+Repository
+https://github.com/Jester-Penlza/Gr12-NUB
+
+Local project when available
+C:\Users\Acer\Desktop\CUTTE KIOSK
+
+Live student kiosk
+https://jester-penlza.github.io/Gr12-NUB/
+
+Live staff workspace
+https://jester-penlza.github.io/Gr12-NUB/staff.html
+
+Supabase project reference
+scvwqyoyzosgavegjwhh
+
+Before doing any work, read handoff/UNIVUE_COMPLETE_AI_HANDOFF.md and README.md. Then inspect git status, the current branch, the latest commits, package.json, the GitHub Pages workflow, and the relevant source files. If graphify-out/graph.json exists, use graphify query before broad source browsing.
+
+Current architecture
+The deployed frontend is static HTML CSS and JavaScript on GitHub Pages. Supabase provides PostgreSQL, Auth, Row Level Security, restricted RPC functions, Realtime, Vault, and Edge Functions. A Raspberry Pi is the recommended touchscreen host and hardware controller. The physical button calls Supabase directly through the Pi service. LEDs and the thermal printer require the browser and hardware service to run locally on the same Pi unless a secure device queue is built later.
+
+Nonnegotiable product rules
+- Keep the UNIVUE name, NU Baliwag and Bulldogs Exchange identity, NU shield, product photographs, and artwork on every garment.
+- Do not replace the brand with websites-master. That folder is visual inspiration only.
+- Keep sizes XS S M L XL XXL and maximum stock 30 per product and size.
+- Available is 4 to 30, low stock is 1 to 3, and out of stock is 0.
+- Stock checks and cart additions are read only. Placing an order performs the atomic stock reservation.
+- Keep the physical LED behavior in hardware. The frontend should show accessible words and quantities rather than imitate the LED as the core feature.
+- Preserve cart, checkout, PayMongo test QR, staff assistance, staff Auth, order processing, receipts, inventory updates, and safe closed-order archiving.
+- Only CANCELLED and COMPLETED orders can be archived. Never delete order or payment audit data to clean a demonstration.
+- PayMongo is test mode only. Do not use or request live keys without explicit school and user authorization.
+- Never expose Supabase service-role keys, PayMongo secret keys, webhook secrets, staff passwords, or GitHub tokens.
+
+Important source locations
+- firmware/esp32/cutte_kiosk_bridge/data is the current web source despite its legacy directory name.
+- supabase/migrations contains the production database changes.
+- supabase/functions contains the PayMongo checkout and webhook functions.
+- hardware/pi contains the current Raspberry Pi service.
+- dist is generated. Never edit it directly.
+- CUTTE_Kiosk_Master_Builder_Brief.md and the Arduino or ESP32 transfer manuals describe the older no-cloud prototype and are not the current source of truth.
+
+Required working method
+1. Make evidence-based changes and preserve unrelated user work.
+2. Use apply_patch for source edits.
+3. Add new Supabase DDL as a new migration and apply it through authenticated Supabase tools.
+4. Run npm.cmd test before and after meaningful changes.
+5. Run graphify update . after code changes.
+6. Inspect git diff and scan for secrets.
+7. Commit and push only the intended files.
+8. Wait for GitHub Pages deployment and verify the live files.
+9. Do not claim physical hardware works until tested on the actual device.
+
+Start by reporting the current branch, working-tree status, latest commit, test result, Supabase connection status, and whether the live Pages deployment matches the repository. Do not modify anything until that audit is complete, unless my new request explicitly asks for an immediate change.

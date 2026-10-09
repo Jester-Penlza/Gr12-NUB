@@ -6,7 +6,7 @@ The first migration creates the product catalog, 36 size-level inventory records
 
 Public kiosk actions use restricted database functions. Staff actions require a Supabase Auth user whose UUID is present in `public.staff_profiles`. Never place a service-role key in the website or Raspberry Pi browser.
 
-PayMongo Hosted Checkout is implemented by `create-paymongo-checkout` and `paymongo-webhook` Edge Functions. The test API key and test webhook signing secret are encrypted in Supabase Vault under `PAYMONGO_SECRET_KEY_TEST` and `PAYMONGO_WEBHOOK_SECRET_TEST`. The browser receives only PayMongo's hosted checkout URL. The webhook verifies the raw request body using HMAC-SHA256 before it can confirm a payment.
+PayMongo QR Ph test payments are implemented by the `create-paymongo-checkout` and `paymongo-webhook` Edge Functions. The checkout function creates a test Payment Intent and QR Ph payment method, attaches them, and returns PayMongo's short-lived test QR image for display inside UNIVUE. The test API key and test webhook signing secret are encrypted in Supabase Vault under `PAYMONGO_SECRET_KEY_TEST` and `PAYMONGO_WEBHOOK_SECRET_TEST`. The webhook verifies the raw request body using HMAC-SHA256 before it can confirm a payment. The older hosted-checkout fields remain for compatibility with existing test records.
 
 After creating a staff user in Supabase Authentication, promote that account with:
 

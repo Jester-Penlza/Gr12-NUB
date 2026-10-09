@@ -10,13 +10,17 @@ UNIVUE is a student-facing uniform kiosk and a separate staff workspace for NU B
 - `tests/` — inventory, HTTP, build, and frontend contract checks.
 - `firmware/arduino/` and `firmware/esp32/` — the earlier two-controller prototype, kept as a hardware reference. The current recommended build uses one Raspberry Pi.
 
+## Complete project handoff
+
+Before transferring UNIVUE to another AI account or developer, read [`handoff/UNIVUE_COMPLETE_AI_HANDOFF.md`](handoff/UNIVUE_COMPLETE_AI_HANDOFF.md). A formatted Word copy is provided at [`handoff/UNIVUE_COMPLETE_AI_HANDOFF.docx`](handoff/UNIVUE_COMPLETE_AI_HANDOFF.docx), and [`handoff/UNIVUE_NEW_AI_START_PROMPT.txt`](handoff/UNIVUE_NEW_AI_START_PROMPT.txt) is a ready-to-paste takeover prompt. The handoff deliberately excludes passwords, payment secrets, service-role keys, and access tokens.
+
 ## Current architecture
 
 ```text
 Student touchscreen kiosk ─┐
                            ├─ Supabase database and realtime ─ Staff dashboard
 Physical help button ─ Pi ─┘                 │
-                 └─ GPIO stock LEDs          └─ PayMongo hosted QR checkout
+                 └─ GPIO stock LEDs          └─ PayMongo test QR payment
 ```
 
 The Raspberry Pi runs Chromium in kiosk mode and can run the local Node server. The browser reads the Supabase inventory and creates orders through restricted database functions. Staff sign in with Supabase Auth. Row Level Security prevents student browsers from changing stock, confirming payments, or reading staff-only records.
