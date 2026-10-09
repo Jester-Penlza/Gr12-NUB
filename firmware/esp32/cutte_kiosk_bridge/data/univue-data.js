@@ -74,6 +74,25 @@
     }));
   }
 
+  async function createPaymongoCheckout(orderReference, accessToken) {
+    assertReady();
+    const result = await client.functions.invoke('create-paymongo-checkout', {
+      body: { orderReference, accessToken }
+    });
+    if (result.error) {
+      let detail = result.error.message || 'PAYMENT_CHECKOUT_UNAVAILABLE';
+      try {
+        const context = await result.error.context?.json();
+        if (context?.error) detail = context.error;
+      } catch { /* use the safe generic message */ }
+      throw new Error(detail);
+    }
+    if (!result.data?.checkoutUrl?.startsWith('https://checkout.paymongo.com/')) {
+      throw new Error('INVALID_PAYMENT_CHECKOUT');
+    }
+    return result.data;
+  }
+
   async function requestAssistance(context = {}) {
     assertReady();
     return unwrap(await client.rpc('request_assistance', {
@@ -202,6 +221,7 @@
     inventoryOverview,
     checkInventory,
     placeOrder,
+    createPaymongoCheckout,
     requestAssistance,
     assistanceStatus,
     getSession,

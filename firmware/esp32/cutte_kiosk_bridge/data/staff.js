@@ -114,11 +114,13 @@ function renderOrders() {
     meta.append(element('span', '', formatWhen(order.created_at)));
     copy.append(meta);
     const actions = element('div', 'staff-record-actions');
-    if (payment?.status !== 'CONFIRMED' && order.status !== 'CANCELLED') {
+    if (order.payment_method === 'CASH' && payment?.status !== 'CONFIRMED' && order.status !== 'CANCELLED') {
       const confirm = element('button', 'primary', 'Confirm payment');
       confirm.type = 'button';
       confirm.dataset.confirmOrder = order.id;
       actions.append(confirm);
+    } else if (order.payment_method === 'GCASH' && payment?.status !== 'CONFIRMED' && order.status !== 'CANCELLED') {
+      actions.append(element('span', 'staff-payment-note', 'Waiting for PayMongo verification'));
     }
     const select = document.createElement('select');
     select.setAttribute('aria-label', `Update status for ${order.reference}`);

@@ -15,8 +15,8 @@ UNIVUE is a student-facing uniform kiosk and a separate staff workspace for NU B
 ```text
 Student touchscreen kiosk ─┐
                            ├─ Supabase database and realtime ─ Staff dashboard
-Physical help button ─ Pi ─┘
-                 └─ GPIO stock LEDs / speaker / thermal receipt printer
+Physical help button ─ Pi ─┘                 │
+                 └─ GPIO stock LEDs          └─ PayMongo hosted QR checkout
 ```
 
 The Raspberry Pi runs Chromium in kiosk mode and can run the local Node server. The browser reads the Supabase inventory and creates orders through restricted database functions. Staff sign in with Supabase Auth. Row Level Security prevents student browsers from changing stock, confirming payments, or reading staff-only records.
@@ -52,9 +52,9 @@ Only users with an active row in `public.staff_profiles` can read orders, handle
 
 ## Checkout and payment behavior
 
-Placing an order rechecks and reserves stock in one database transaction. Cash and GCash remain `PENDING` until staff confirms payment. A receipt record is created after confirmation. UNIVUE never collects a card number, CVV, GCash PIN, or OTP.
+Placing an order rechecks and reserves stock in one database transaction. Cash remains `PENDING` until staff confirms it. Choosing GCash/QR Ph opens PayMongo Hosted Checkout V2, where PayMongo creates a one-time exact-amount QR. A signed `checkout_session.payment.paid` webhook confirms the database payment and creates the receipt automatically. UNIVUE never collects a card number, CVV, GCash PIN, or OTP.
 
-To show the school's official GCash QR, set `gcashQrImageUrl` in `supabase-config.js` to an approved school-controlled image URL. It is deliberately blank by default so the prototype never displays an invented payment destination.
+The PayMongo integration is currently configured with test credentials. Secrets are encrypted in Supabase Vault and are read only by the deployed Edge Functions. No PayMongo secret is stored in GitHub, browser code, or the Raspberry Pi frontend. Move to live mode only after a complete test checkout and webhook demonstration has passed and the school has approved the merchant account.
 
 ## Assistance button and Raspberry Pi
 

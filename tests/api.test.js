@@ -25,7 +25,7 @@ test('web assets are served with the required kiosk screens', async (t) => {
     assert.match(html, new RegExp(`data-screen="${screen}"`));
   }
   assert.match(html, /UNIVUE \| NU Baliwag Uniform View/);
-  assert.match(html, /Payment requires staff confirmation/);
+  assert.match(html, /QR payments are marked paid only after verified confirmation from PayMongo/);
   assert.match(html, /NU Baliwag/);
   assert.match(html, /Bulldogs Exchange/);
   assert.match(html, /Student \/ Employee ID/);
@@ -42,7 +42,7 @@ test('web assets are served with the required kiosk screens', async (t) => {
   assert.doesNotMatch(html, /legend-light|result-light-dot|status-light-panel/);
   assert.match(html, /Verified replacement quantity \(0–30\)/);
   assert.match(html, /data-action="request-assistance"/);
-  assert.match(html, /GCash via official school QR/);
+  assert.match(html, /GCash or banking app via QR Ph/);
 
   const cssResponse = await fetch(`${baseUrl}/styles.css`);
   assert.match(cssResponse.headers.get('content-type'), /^text\/css/);

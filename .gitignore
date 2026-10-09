@@ -9,3 +9,4 @@ __pycache__/
 *.pyc
 websites-master/
 websites-master.zip
+supabase/.temp/

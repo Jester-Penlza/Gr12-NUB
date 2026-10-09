@@ -22,6 +22,9 @@ test('GitHub Pages build contains the UNIVUE kiosk, staff portal, and live Supab
   assert.doesNotMatch(html, /(?:src|href)="\/(?:images|styles\.css|app\.js)/);
   assert.match(app, /LIVE_DATABASE_MODE/);
   assert.match(app, /DATA\.placeOrder/);
+  assert.match(app, /DATA\.createPaymongoCheckout/);
+  assert.match(html, /PayMongo's secure checkout/);
+  assert.match(html, /Retry secure QR payment/);
   assert.match(app, /DATA\.requestAssistance/);
   assert.match(app, /'\.\/images\/products\/male-polo\.png'/);
   assert.ok(fs.statSync(path.join(root, 'dist', 'images', 'branding', 'nu-shield.png')).size > 1_000_000);
@@ -34,4 +37,21 @@ test('GitHub Pages build contains the UNIVUE kiosk, staff portal, and live Supab
   assert.match(staffApp, /const loginForm = event\.currentTarget;/);
   assert.match(staffApp, /loginForm\.reset\(\);/);
   assert.doesNotMatch(staffApp, /await[\s\S]{0,500}event\.currentTarget\.reset\(\)/);
+  assert.match(staffApp, /Waiting for PayMongo verification/);
+});
+
+test('PayMongo integration keeps secret keys server-side and verifies signed webhooks', () => {
+  const checkout = fs.readFileSync(path.join(root, 'supabase', 'functions', 'create-paymongo-checkout', 'index.ts'), 'utf8');
+  const webhook = fs.readFileSync(path.join(root, 'supabase', 'functions', 'paymongo-webhook', 'index.ts'), 'utf8');
+  const browserFiles = [
+    'index.html', 'app.js', 'univue-data.js', 'supabase-config.js', 'staff.js'
+  ].map((name) => fs.readFileSync(path.join(root, 'firmware', 'esp32', 'cutte_kiosk_bridge', 'data', name), 'utf8')).join('\n');
+
+  assert.match(checkout, /PAYMONGO_SECRET_KEY_TEST/);
+  assert.match(checkout, /https:\/\/api\.paymongo\.com\/v2\/checkout_sessions/);
+  assert.match(checkout, /payment_method_types: \["qrph"\]/);
+  assert.match(webhook, /Paymongo-Signature/);
+  assert.match(webhook, /HMAC/);
+  assert.match(webhook, /checkout_session\.payment\.paid/);
+  assert.doesNotMatch(browserFiles, /sk_(?:test|live)_/);
 });

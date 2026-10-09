@@ -7,6 +7,7 @@ const LIVE_DATABASE_MODE = Boolean(DATA?.isReady());
 const STATIC_DEMO_MODE = document.documentElement.dataset.runtime === 'github-pages' && !LIVE_DATABASE_MODE;
 const DEMO_INVENTORY_KEY = 'cutte_github_demo_inventory_v1';
 const DEMO_SESSION_KEY = 'cutte_github_demo_admin';
+const PENDING_PAYMENT_KEY = 'univue_pending_paymongo_payment';
 
 const ITEMS = Object.freeze({
   MALE_POLO: { label: 'Male Polo', category: 'FORMAL', gender: 'MALE' },
@@ -431,6 +432,8 @@ function friendlyError(error) {
   if (error.message === 'UNAUTHORIZED' || error.status === 401) return 'Your administrator session expired. Log in again.';
   if (error.message === 'SUPABASE_UNAVAILABLE') return 'The UNIVUE database connection is unavailable.';
   if (error.message === 'STOCK_NOT_FOUND') return 'No inventory record exists for that item and size.';
+  if (error.message === 'PAYMENT_SESSION_EXPIRED') return 'This secure payment session is no longer available. Ask staff to help with the reserved order.';
+  if (error.message.includes('PAYMENT') || error.message.includes('CHECKOUT')) return 'The secure QR payment page is temporarily unavailable. Your order remains reserved; retry when ready.';
   if (error.message.includes('INSUFFICIENT_STOCK')) return 'One or more items no longer have enough stock for this order.';
   if (error.message.includes('UNKNOWN_KIOSK')) return 'This kiosk is not registered in UNIVUE.';
   return 'UNIVUE received an invalid response or could not reach the live stock database.';
@@ -570,9 +573,48 @@ function saveOrder(order) {
   try {
     const orders = JSON.parse(localStorage.getItem('cutte_orders') || '[]');
     const safeOrders = Array.isArray(orders) ? orders : [];
-    safeOrders.unshift(order);
+    const storedOrder = { ...order };
+    delete storedOrder.accessToken;
+    safeOrders.unshift(storedOrder);
     localStorage.setItem('cutte_orders', JSON.stringify(safeOrders.slice(0, 20)));
   } catch { /* the visible receipt still remains available */ }
+}
+
+function renderOrderConfirmation(order, paymentMessage) {
+  state.lastOrderReference = order.reference;
+  byId('order-reference').textContent = order.reference;
+  byId('order-payment').textContent = paymentMessage || (order.paymentMethod === 'CASH'
+    ? 'Cash · awaiting staff confirmation'
+    : 'QR Ph / GCash · awaiting verified PayMongo confirmation');
+  byId('order-fulfillment').textContent = order.fulfillment === 'CAMPUS_DELIVERY'
+    ? 'Campus delivery requested'
+    : 'Pickup at the merchandise office';
+  byId('order-success-items').innerHTML = (order.items || []).map((line) => `<div><span>${itemLabel(line.item)} · ${line.size} × ${line.quantity}</span><strong>${currency.format(line.unitPrice * line.quantity)}</strong></div>`).join('') + `<div class="receipt-total"><span>Total due</span><strong>${currency.format(order.total)}</strong></div>`;
+  byId('retry-online-payment').hidden = order.paymentMethod !== 'GCASH';
+  showScreen('order-success');
+}
+
+function storePendingPayment(order) {
+  sessionStorage.setItem(PENDING_PAYMENT_KEY, JSON.stringify({
+    orderReference: order.reference,
+    accessToken: order.accessToken
+  }));
+}
+
+async function retryOnlinePayment() {
+  const button = byId('retry-online-payment');
+  button.disabled = true;
+  button.textContent = 'Opening secure payment…';
+  try {
+    const pending = JSON.parse(sessionStorage.getItem(PENDING_PAYMENT_KEY) || 'null');
+    if (!pending?.orderReference || !pending?.accessToken) throw new Error('PAYMENT_SESSION_EXPIRED');
+    const checkout = await DATA.createPaymongoCheckout(pending.orderReference, pending.accessToken);
+    window.location.assign(checkout.checkoutUrl);
+  } catch (error) {
+    button.disabled = false;
+    button.textContent = 'Retry secure QR payment';
+    showToast(friendlyError(error));
+  }
 }
 
 async function placeOrder(event) {
@@ -611,19 +653,28 @@ async function placeOrder(event) {
       const created = await DATA.placeOrder(order);
       order.id = created.id;
       order.reference = created.reference;
+      order.accessToken = created.accessToken;
       order.total = Number(created.total);
       order.status = created.status;
     }
     saveOrder(order);
-    state.lastOrderReference = order.reference;
-    byId('order-reference').textContent = order.reference;
-    byId('order-payment').textContent = order.paymentMethod === 'CASH' ? 'Cash · awaiting staff confirmation' : 'GCash QR · awaiting staff confirmation';
-    byId('order-fulfillment').textContent = order.fulfillment === 'CAMPUS_DELIVERY' ? 'Campus delivery requested' : 'Pickup at the merchandise office';
-    byId('order-success-items').innerHTML = order.items.map((line) => `<div><span>${itemLabel(line.item)} · ${line.size} × ${line.quantity}</span><strong>${currency.format(line.unitPrice * line.quantity)}</strong></div>`).join('') + `<div class="receipt-total"><span>Total due</span><strong>${currency.format(order.total)}</strong></div>`;
     state.cart = [];
     saveCart();
     formElement.reset();
-    showScreen('order-success');
+    if (LIVE_DATABASE_MODE && order.paymentMethod === 'GCASH') {
+      storePendingPayment(order);
+      message.textContent = 'Order reserved. Opening PayMongo secure QR payment…';
+      try {
+        const checkout = await DATA.createPaymongoCheckout(order.reference, order.accessToken);
+        window.location.assign(checkout.checkoutUrl);
+        return;
+      } catch (paymentError) {
+        renderOrderConfirmation(order, 'QR payment page unavailable · order remains safely reserved');
+        showToast(friendlyError(paymentError));
+        return;
+      }
+    }
+    renderOrderConfirmation(order);
   } catch (error) {
     if (error.message.startsWith('INSUFFICIENT_STOCK:') && error.message.split(':').length >= 4) {
       const [, item, size, available] = error.message.split(':');
@@ -870,6 +921,7 @@ document.addEventListener('click', (event) => {
     'confirm-check': checkStock,
     'check-another': () => { resetStudent(); showScreen('category'); },
     retry: () => state.lastAction?.(),
+    'retry-online-payment': retryOnlinePayment,
     'read-current': readCurrent,
     logout
   };
@@ -896,16 +948,7 @@ byId('checkout-form').addEventListener('change', (event) => {
   const isGcash = event.target.value === 'GCASH';
   const panel = byId('gcash-qr-panel');
   panel.hidden = !isGcash;
-  if (!isGcash) return;
-  const configuredImage = DATA?.config?.gcashQrImageUrl;
-  const image = byId('gcash-qr-image');
-  if (configuredImage) {
-    image.src = configuredImage;
-    byId('gcash-qr-message').textContent = 'Scan only the official NU Baliwag QR, then show the successful payment to staff for confirmation.';
-  } else {
-    image.removeAttribute('src');
-    byId('gcash-qr-message').textContent = 'The school has not configured its official GCash QR yet. Staff can present the verified QR at the counter.';
-  }
+  byId('place-order').textContent = isGcash ? 'Continue to secure QR payment' : 'Place order';
 });
 byId('admin-category').addEventListener('change', () => {
   byId('admin-gender').value = '';
@@ -917,5 +960,24 @@ byId('admin-size').addEventListener('change', resetAdminCurrent);
 
 if (!LIVE_DATABASE_MODE) byId('deployment-note').hidden = false;
 renderCart();
+const paymentReturn = new URLSearchParams(window.location.search);
+if (paymentReturn.has('payment') && paymentReturn.get('order')) {
+  const reference = paymentReturn.get('order');
+  let savedOrder = null;
+  try {
+    const orders = JSON.parse(localStorage.getItem('cutte_orders') || '[]');
+    savedOrder = Array.isArray(orders) ? orders.find((order) => order.reference === reference) : null;
+  } catch { /* show a minimal confirmation below */ }
+  const returnedOrder = savedOrder || { reference, paymentMethod: 'GCASH', fulfillment: 'PICKUP', items: [], total: 0 };
+  const cancelled = paymentReturn.get('payment') === 'cancelled';
+  renderOrderConfirmation(returnedOrder, cancelled
+    ? 'QR payment cancelled · your reserved order is still awaiting payment'
+    : 'Payment submitted · waiting for secure PayMongo verification');
+  if (!cancelled) {
+    sessionStorage.removeItem(PENDING_PAYMENT_KEY);
+    byId('retry-online-payment').hidden = true;
+  }
+  window.history.replaceState({}, document.title, window.location.pathname);
+}
 pollStatus();
 setInterval(pollStatus, 2000);
