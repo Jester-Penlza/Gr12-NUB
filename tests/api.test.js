@@ -60,6 +60,7 @@ test('web assets are served with the required kiosk screens', async (t) => {
   const staffHtml = await staffResponse.text();
   assert.match(staffHtml, /Assistance queue/);
   assert.match(staffHtml, /Recent orders/);
+  assert.match(staffHtml, /id="clear-closed-orders"/);
   assert.match(staffHtml, /Inventory manager/);
 
   for (const asset of ['/staff.css', '/staff.js', '/supabase-config.js', '/univue-data.js']) {

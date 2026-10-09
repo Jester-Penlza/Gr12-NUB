@@ -118,6 +118,10 @@ function formatWhen(value) {
   return value ? dateTime.format(new Date(value)) : 'Not yet';
 }
 
+function isClosedOrder(order) {
+  return ['CANCELLED', 'COMPLETED'].includes(order.status);
+}
+
 function renderAssistance() {
   const requests = state.snapshot.assistance;
   const actionable = requests.filter((request) => ['PENDING', 'ACKNOWLEDGED'].includes(request.status));
@@ -155,8 +159,12 @@ function renderAssistance() {
 
 function renderOrders() {
   const orders = state.snapshot.orders;
+  const closedCount = orders.filter(isClosedOrder).length;
   const host = byId('orders-list');
+  const clearButton = byId('clear-closed-orders');
   host.replaceChildren();
+  clearButton.disabled = closedCount === 0;
+  clearButton.textContent = closedCount > 0 ? `Clear closed history (${closedCount})` : 'Clear closed history';
   byId('orders-empty').hidden = orders.length > 0;
   for (const order of orders) {
     const payment = Array.isArray(order.payments) ? order.payments[0] : order.payments;
@@ -174,6 +182,14 @@ function renderOrders() {
     meta.append(element('span', '', formatWhen(order.created_at)));
     copy.append(meta);
     const actions = element('div', 'staff-record-actions');
+    if (isClosedOrder(order)) {
+      const archive = element('button', 'archive-order-button', '\u00d7');
+      archive.type = 'button';
+      archive.dataset.archiveOrder = order.id;
+      archive.setAttribute('aria-label', `Remove ${order.reference} from recent orders`);
+      archive.title = 'Remove from Recent Orders';
+      actions.append(archive);
+    }
     if (order.payment_method === 'CASH' && payment?.status !== 'CONFIRMED' && order.status !== 'CANCELLED') {
       const confirm = element('button', 'primary', 'Confirm payment');
       confirm.type = 'button';
@@ -347,6 +363,24 @@ byId('staff-sound-toggle').addEventListener('click', () => toggleAlertSound());
 byId('staff-product').addEventListener('change', syncInventoryQuantity);
 byId('staff-size').addEventListener('change', syncInventoryQuantity);
 
+byId('clear-closed-orders').addEventListener('click', async (event) => {
+  const button = event.currentTarget;
+  const closedCount = state.snapshot?.orders.filter(isClosedOrder).length || 0;
+  if (!closedCount) return;
+  const confirmed = window.confirm(`Hide ${closedCount} cancelled or completed order${closedCount === 1 ? '' : 's'} from Recent Orders? Payment, receipt, and audit records will remain in the database.`);
+  if (!confirmed) return;
+  button.disabled = true;
+  try {
+    const result = await DATA.archiveClosedOrders();
+    await refreshSnapshot({ quiet: true });
+    const archived = Number(result?.archived) || closedCount;
+    showToast(`${archived} closed order${archived === 1 ? '' : 's'} removed from Recent Orders. Audit records were retained.`);
+  } catch (error) {
+    showToast(error.message || 'Could not clear closed order history.');
+    button.disabled = false;
+  }
+});
+
 byId('staff-inventory-form').addEventListener('submit', async (event) => {
   event.preventDefault();
   const quantity = Number(byId('staff-quantity').value);
@@ -394,6 +428,22 @@ document.addEventListener('click', async (event) => {
         ? `Payment confirmed. Receipt ${receipt.receiptNumber} was printed.`
         : `Payment confirmed. Receipt ${receipt.receiptNumber} is ready.`);
     } catch (error) { showToast(error.message || 'Could not confirm payment.'); }
+  }
+  const archiveButton = event.target.closest('[data-archive-order]');
+  if (archiveButton) {
+    const order = state.snapshot.orders.find((entry) => entry.id === archiveButton.dataset.archiveOrder);
+    if (!order || !isClosedOrder(order)) return;
+    const confirmed = window.confirm(`Hide ${order.reference} from Recent Orders? The transaction will remain in the database for auditing.`);
+    if (!confirmed) return;
+    archiveButton.disabled = true;
+    try {
+      await DATA.archiveOrder(order.id);
+      await refreshSnapshot({ quiet: true });
+      showToast('Order removed from Recent Orders. Audit records were retained.');
+    } catch (error) {
+      showToast(error.message || 'Could not remove this order from Recent Orders.');
+      archiveButton.disabled = false;
+    }
   }
 });
 

@@ -47,6 +47,21 @@ test('GitHub Pages build contains the UNIVUE kiosk, staff portal, and live Supab
   assert.match(staffApp, /function playAssistanceAlert/);
   assert.match(staffApp, /payload\?\.eventType === 'INSERT'/);
   assert.match(staffApp, /New assistance call received/);
+  assert.match(staff, /id="clear-closed-orders"/);
+  assert.match(staffApp, /DATA\.archiveOrder/);
+  assert.match(staffApp, /DATA\.archiveClosedOrders/);
+  assert.match(staffApp, /\['CANCELLED', 'COMPLETED'\]/);
+  assert.match(staffApp, /Audit records were retained/);
+});
+
+test('order history cleanup archives only closed orders and preserves audit data', () => {
+  const migration = fs.readFileSync(path.join(root, 'supabase', 'migrations', '202610090010_order_history_archive.sql'), 'utf8');
+
+  assert.match(migration, /private\.is_staff\(\)/);
+  assert.match(migration, /status not in \('CANCELLED', 'COMPLETED'\)/);
+  assert.match(migration, /ONLY_CLOSED_ORDERS_CAN_BE_ARCHIVED/);
+  assert.match(migration, /archived_at = coalesce\(archived_at, now\(\)\)/);
+  assert.doesNotMatch(migration, /delete\s+from\s+public\.orders/i);
 });
 
 test('PayMongo integration keeps secret keys server-side and verifies signed webhooks', () => {

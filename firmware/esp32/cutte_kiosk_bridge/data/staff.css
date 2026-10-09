@@ -24,6 +24,7 @@
 .staff-section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 2rem; margin-bottom: 1.4rem; }
 .staff-section-heading h2 { margin: .2rem 0 .5rem; color: var(--navy); font-size: clamp(1.7rem, 4vw, 2.5rem); }
 .staff-section-heading p { margin-bottom: 0; color: var(--muted); }
+.staff-section-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: .65rem; }
 .live-chip { display: inline-flex; align-items: center; gap: .45rem; border-radius: 999px; padding: .48rem .75rem; color: #176b3a; background: #e6f7ed; font-size: .75rem; font-weight: 900; }
 .live-chip i { width: 8px; height: 8px; border-radius: 50%; background: #25a85b; box-shadow: 0 0 0 4px rgba(37,168,91,.12); }
 .staff-card-list { display: grid; gap: .85rem; }
@@ -36,6 +37,9 @@
 .staff-record-meta { display: flex; flex-wrap: wrap; gap: .45rem .8rem; margin-top: .65rem; color: var(--muted); font-size: .78rem; }
 .staff-record-actions { min-width: 170px; display: flex; align-items: flex-end; justify-content: center; flex-direction: column; gap: .55rem; }
 .staff-record-actions button, .staff-record-actions select { width: 100%; min-height: 42px; }
+.staff-record-actions .archive-order-button { width: 42px; min-height: 42px; border: 1px solid #e6b8be; border-radius: 50%; padding: 0; color: #98273a; background: #fff4f5; font-size: 1.35rem; font-weight: 800; line-height: 1; }
+.staff-record-actions .archive-order-button:hover { border-color: #c85e6e; color: #7c1f30; background: #ffe6e9; }
+.staff-record-actions .archive-order-button:focus-visible { outline: 3px solid rgba(152,39,58,.25); outline-offset: 2px; }
 .staff-empty { border: 1px dashed #c5d0df; border-radius: 16px; padding: 2rem; color: var(--muted); background: #f8fafc; text-align: center; }
 .staff-empty strong, .staff-empty span { display: block; }
 .staff-empty strong { margin-bottom: .4rem; color: var(--navy); }
@@ -62,6 +66,7 @@
   .staff-nav { grid-column: 1 / -1; }
   .staff-nav button { white-space: nowrap; }
   .staff-welcome, .staff-section-heading { align-items: flex-start; flex-direction: column; }
+  .staff-section-actions { width: 100%; justify-content: space-between; }
   .staff-welcome-actions { width: 100%; justify-content: flex-start; }
   .staff-metrics, .staff-inventory-grid { grid-template-columns: 1fr; }
   .staff-record { grid-template-columns: 1fr; }

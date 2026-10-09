@@ -146,7 +146,7 @@
     assertReady();
     const [assistance, orders, inventory, products] = await Promise.all([
       client.from('assistance_requests').select('id,status,requested_at,acknowledged_at,resolved_at,message,product_code,size,order_reference,kiosks(code,display_name,location)').order('requested_at', { ascending: false }).limit(50),
-      client.from('orders').select('id,reference,customer_name,student_id,fulfillment,payment_method,total,status,created_at,payments(id,status,provider_reference,confirmed_at),order_items(product_code,size,quantity,unit_price)').order('created_at', { ascending: false }).limit(50),
+      client.from('orders').select('id,reference,customer_name,student_id,fulfillment,payment_method,total,status,created_at,payments(id,status,provider_reference,confirmed_at),order_items(product_code,size,quantity,unit_price)').is('archived_at', null).order('created_at', { ascending: false }).limit(50),
       client.from('inventory').select('product_code,size,quantity,updated_at').order('product_code').order('size'),
       client.from('products').select('code,name,category,gender,price,image_path,active').order('name')
     ]);
@@ -180,6 +180,16 @@
   async function updateOrderStatus(id, status) {
     assertReady();
     return unwrap(await client.rpc('staff_set_order_status', { p_order_id: id, p_status: status }));
+  }
+
+  async function archiveOrder(id) {
+    assertReady();
+    return unwrap(await client.rpc('staff_archive_order', { p_order_id: id }));
+  }
+
+  async function archiveClosedOrders() {
+    assertReady();
+    return unwrap(await client.rpc('staff_archive_closed_orders'));
   }
 
   async function confirmPayment(order) {
@@ -239,6 +249,8 @@
     updateAssistance,
     updateInventory,
     updateOrderStatus,
+    archiveOrder,
+    archiveClosedOrders,
     confirmPayment,
     printReceipt,
     subscribeStaff

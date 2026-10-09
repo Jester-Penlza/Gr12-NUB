@@ -50,6 +50,8 @@ The website uses the public values in `supabase-config.js`. A Supabase publishab
 
 Only users with an active row in `public.staff_profiles` can read orders, handle assistance requests, confirm payments, issue receipts, or update inventory.
 
+In **Recent orders**, staff can use the × button on a cancelled or completed order, or **Clear closed history**, to remove closed demonstration transactions from the active workspace. This archives the order instead of deleting it: payment, receipt, and audit records remain in Supabase, and active orders cannot be archived.
+
 ## Checkout and payment behavior
 
 Placing an order rechecks and reserves stock in one database transaction. Cash remains `PENDING` until staff confirms it. Choosing the PayMongo simulation creates a QR Ph Payment Intent and displays PayMongo's actual short-lived test QR image inside UNIVUE for the exact order total. A signed `payment.paid` webhook confirms the database payment and creates the receipt automatically. The older `checkout_session.payment.paid` handler remains for already-created test sessions. UNIVUE never collects a card number, CVV, wallet PIN, or OTP.
