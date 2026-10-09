@@ -48,4 +48,6 @@ test('web logic keeps formal garments gender-filtered and unisex items gender-fr
   assert.match(app, /if \(category === 'FORMAL'\) showScreen\('gender'\);\s*else showSize\(\);/);
   assert.match(app, /const MAX_QUANTITY = 30/);
   assert.match(app, /\/inventory\?item=/);
+  assert.match(app, /LIVE_DATABASE_MODE/);
+  assert.match(app, /DATA\.checkInventory/);
 });

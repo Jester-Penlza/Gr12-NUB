@@ -24,10 +24,10 @@ test('web assets are served with the required kiosk screens', async (t) => {
   for (const screen of ['home', 'category', 'gender', 'garment', 'size', 'confirm', 'result', 'cart', 'checkout', 'order-success', 'error', 'admin-login', 'admin-inventory']) {
     assert.match(html, new RegExp(`data-screen="${screen}"`));
   }
-  assert.match(html, /Payment is completed with staff at the school counter/);
-  assert.match(html, /No online charge is made here/);
-  assert.match(html, /NU Baliwag Bulldogs Exchange/);
-  assert.match(html, /National University/);
+  assert.match(html, /UNIVUE \| NU Baliwag Uniform View/);
+  assert.match(html, /Payment requires staff confirmation/);
+  assert.match(html, /NU Baliwag/);
+  assert.match(html, /Bulldogs Exchange/);
   assert.match(html, /Student \/ Employee ID/);
   assert.match(html, /College \/ Department/);
   assert.match(html, /Contact number/);
@@ -41,6 +41,8 @@ test('web assets are served with the required kiosk screens', async (t) => {
   assert.match(html, /id="result-stock-quantity"/);
   assert.doesNotMatch(html, /legend-light|result-light-dot|status-light-panel/);
   assert.match(html, /Verified replacement quantity \(0–30\)/);
+  assert.match(html, /data-action="request-assistance"/);
+  assert.match(html, /GCash via official school QR/);
 
   const cssResponse = await fetch(`${baseUrl}/styles.css`);
   assert.match(cssResponse.headers.get('content-type'), /^text\/css/);
@@ -49,6 +51,18 @@ test('web assets are served with the required kiosk screens', async (t) => {
   const scriptResponse = await fetch(`${baseUrl}/app.js`);
   assert.match(scriptResponse.headers.get('content-type'), /^text\/javascript/);
   assert.ok((await scriptResponse.text()).length > 1000);
+
+  const staffResponse = await fetch(`${baseUrl}/staff.html`);
+  assert.equal(staffResponse.status, 200);
+  const staffHtml = await staffResponse.text();
+  assert.match(staffHtml, /Assistance queue/);
+  assert.match(staffHtml, /Recent orders/);
+  assert.match(staffHtml, /Inventory manager/);
+
+  for (const asset of ['/staff.css', '/staff.js', '/supabase-config.js', '/univue-data.js']) {
+    const response = await fetch(`${baseUrl}${asset}`);
+    assert.equal(response.status, 200, `${asset} should be served`);
+  }
 
   const imageResponse = await fetch(`${baseUrl}/images/products/male-polo.png`);
   assert.match(imageResponse.headers.get('content-type'), /^image\/png/);
@@ -81,7 +95,7 @@ test('item overview returns all six current size counts without changing them', 
   assert.equal(inventory.check('T_SHIRT', 'M').quantity, 30);
 });
 
-test('cart checkout remains stock-first and does not collect payment credentials', async (t) => {
+test('cart checkout uses the live order RPC and never collects payment credentials', async (t) => {
   const { server } = createKioskServer();
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
@@ -91,11 +105,36 @@ test('cart checkout remains stock-first and does not collect payment credentials
   const script = await (await fetch(`${baseUrl}/app.js`)).text();
   assert.match(script, /async function placeOrder/);
   assert.match(script, /\/check\?item=/);
+  assert.match(script, /DATA\.placeOrder/);
   assert.match(script, /AWAITING_COUNTER_PAYMENT/);
   assert.match(script, /collegeDepartment/);
   assert.match(script, /contactNumber/);
   assert.match(script, /fulfillment/);
   assert.doesNotMatch(script, /cardNumber|cvv|expiryDate/);
+});
+
+test('hardware indicator endpoint validates and records a Raspberry Pi LED command', async (t) => {
+  const { server, hardware } = createKioskServer();
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  t.after(() => server.close());
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  const result = await request(baseUrl, '/hardware/indicator', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ item: 'T_SHIRT', size: 'M', quantity: 2, status: 'LOW_STOCK' })
+  });
+  assert.equal(result.response.status, 200);
+  assert.equal(result.body.confirmed, true);
+  assert.deepEqual(hardware.indicator, { item: 'T_SHIRT', size: 'M', quantity: 2, status: 'LOW_STOCK' });
+
+  const invalid = await request(baseUrl, '/hardware/indicator', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: 'PURPLE' })
+  });
+  assert.equal(invalid.response.status, 400);
 });
 
 test('HTTP flow enforces authentication and confirms updates', async (t) => {

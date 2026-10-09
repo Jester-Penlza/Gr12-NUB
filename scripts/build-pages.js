@@ -11,13 +11,19 @@ if (path.dirname(destination) !== root) throw new Error('Unsafe Pages output pat
 fs.rmSync(destination, { recursive: true, force: true });
 fs.cpSync(source, destination, { recursive: true });
 
-const htmlPath = path.join(destination, 'index.html');
-const html = fs.readFileSync(htmlPath, 'utf8')
-  .replace('<html lang="en">', '<html lang="en" data-runtime="github-pages">')
-  .replaceAll('src="/images/', 'src="./images/')
-  .replace('href="/styles.css"', 'href="./styles.css"')
-  .replace('src="/app.js"', 'src="./app.js"');
-fs.writeFileSync(htmlPath, html);
+for (const fileName of ['index.html', 'staff.html']) {
+  const htmlPath = path.join(destination, fileName);
+  let html = fs.readFileSync(htmlPath, 'utf8')
+    .replaceAll('src="/images/', 'src="./images/')
+    .replaceAll('href="/styles.css"', 'href="./styles.css"')
+    .replaceAll('href="/staff.css"', 'href="./staff.css"')
+    .replaceAll('src="/supabase-config.js"', 'src="./supabase-config.js"')
+    .replaceAll('src="/univue-data.js"', 'src="./univue-data.js"')
+    .replaceAll('src="/staff.js"', 'src="./staff.js"')
+    .replaceAll('src="/app.js"', 'src="./app.js"');
+  if (fileName === 'index.html') html = html.replace('<html lang="en">', '<html lang="en" data-runtime="github-pages">');
+  fs.writeFileSync(htmlPath, html);
+}
 
 const appPath = path.join(destination, 'app.js');
 const app = fs.readFileSync(appPath, 'utf8').replaceAll("'/images/", "'./images/");

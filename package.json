@@ -2,12 +2,12 @@
   "name": "cutte-uniform-stock-kiosk",
   "version": "1.0.0",
   "private": true,
-  "description": "Local, no-database Arduino/ESP32 school uniform stock kiosk",
+  "description": "UNIVUE — NU Baliwag live uniform stock, ordering, payment, assistance, and staff kiosk",
   "scripts": {
     "start": "node simulator/server.js",
     "build:pages": "node scripts/build-pages.js",
     "preview:pages": "node scripts/preview-pages.js",
-    "check:web": "node --check firmware/esp32/cutte_kiosk_bridge/data/app.js",
+    "check:web": "node --check firmware/esp32/cutte_kiosk_bridge/data/app.js && node --check firmware/esp32/cutte_kiosk_bridge/data/univue-data.js && node --check firmware/esp32/cutte_kiosk_bridge/data/staff.js",
     "test": "node --test tests/*.test.js && npm run check:web && npm run build:pages"
   },
   "engines": {

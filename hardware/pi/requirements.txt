@@ -1,0 +1,2 @@
+gpiozero==2.0.1
+python-escpos==3.1

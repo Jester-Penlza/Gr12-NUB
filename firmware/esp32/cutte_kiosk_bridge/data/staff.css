@@ -1,0 +1,67 @@
+.staff-body { min-height: 100vh; background: #f3f6fb; }
+.staff-topbar { min-height: 78px; position: sticky; top: 0; z-index: 40; display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 1rem; padding: .85rem clamp(1rem, 4vw, 4rem); border-bottom: 1px solid rgba(11,31,58,.08); background: rgba(255,255,255,.97); backdrop-filter: blur(14px); }
+.staff-topbar .brand { text-decoration: none; }
+.staff-nav { display: flex; align-items: center; justify-content: center; gap: .35rem; }
+.staff-nav button { min-height: 44px; display: flex; align-items: center; gap: .5rem; border-radius: 10px; padding: .65rem .85rem; color: var(--muted); background: transparent; font-weight: 850; }
+.staff-nav button strong { min-width: 22px; border-radius: 999px; padding: .15rem .4rem; color: var(--navy); background: #e6edf7; font-size: .7rem; }
+.staff-nav button.active { color: white; background: var(--navy); }
+.staff-nav button.active strong { color: var(--navy); background: var(--gold); }
+.staff-main { width: min(1240px, calc(100% - 2rem)); min-height: calc(100vh - 220px); margin: 0 auto; padding: clamp(2rem, 5vw, 4.5rem) 0; }
+.staff-login-card { margin-top: clamp(1rem, 6vw, 5rem); }
+.staff-login-card h1 { margin: .35rem 0 1rem; color: var(--navy); font-size: clamp(2rem, 5vw, 3.4rem); line-height: .95; }
+.staff-login-card code { border-radius: 4px; padding: .1rem .3rem; background: #edf2f8; }
+.staff-welcome { display: flex; align-items: flex-end; justify-content: space-between; gap: 2rem; }
+.staff-welcome h1 { margin: .25rem 0 .55rem; color: var(--navy); font-size: clamp(2.1rem, 5vw, 4.2rem); line-height: .95; letter-spacing: -.045em; }
+.staff-welcome p { margin-bottom: 0; color: var(--muted); }
+.staff-metrics { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 1rem; margin: 2rem 0; }
+.staff-metrics article { min-height: 150px; display: flex; flex-direction: column; justify-content: space-between; border: 1px solid var(--line); border-radius: 18px; padding: 1.2rem; background: white; box-shadow: var(--shadow-sm); }
+.staff-metrics span { color: var(--muted); font-size: .75rem; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; }
+.staff-metrics strong { color: var(--navy); font-size: clamp(2rem, 5vw, 3.35rem); line-height: 1; }
+.staff-metrics small { color: var(--muted); line-height: 1.35; }
+.staff-panel { border: 1px solid var(--line); border-radius: 22px; padding: clamp(1rem, 3vw, 2rem); background: white; box-shadow: var(--shadow-sm); }
+.staff-section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 2rem; margin-bottom: 1.4rem; }
+.staff-section-heading h2 { margin: .2rem 0 .5rem; color: var(--navy); font-size: clamp(1.7rem, 4vw, 2.5rem); }
+.staff-section-heading p { margin-bottom: 0; color: var(--muted); }
+.live-chip { display: inline-flex; align-items: center; gap: .45rem; border-radius: 999px; padding: .48rem .75rem; color: #176b3a; background: #e6f7ed; font-size: .75rem; font-weight: 900; }
+.live-chip i { width: 8px; height: 8px; border-radius: 50%; background: #25a85b; box-shadow: 0 0 0 4px rgba(37,168,91,.12); }
+.staff-card-list { display: grid; gap: .85rem; }
+.staff-record { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 1.2rem; border: 1px solid #dce3ed; border-radius: 16px; padding: 1.15rem; background: #fbfcfe; }
+.staff-record.pending { border-left: 5px solid var(--gold); }
+.staff-record.acknowledged { border-left: 5px solid var(--blue); }
+.staff-record.paid { border-left: 5px solid #25a85b; }
+.staff-record h3 { margin: .22rem 0 .35rem; color: var(--navy); font-size: 1.08rem; }
+.staff-record p, .staff-record small { margin: 0; color: var(--muted); line-height: 1.45; }
+.staff-record-meta { display: flex; flex-wrap: wrap; gap: .45rem .8rem; margin-top: .65rem; color: var(--muted); font-size: .78rem; }
+.staff-record-actions { min-width: 170px; display: flex; align-items: flex-end; justify-content: center; flex-direction: column; gap: .55rem; }
+.staff-record-actions button, .staff-record-actions select { width: 100%; min-height: 42px; }
+.staff-empty { border: 1px dashed #c5d0df; border-radius: 16px; padding: 2rem; color: var(--muted); background: #f8fafc; text-align: center; }
+.staff-empty strong, .staff-empty span { display: block; }
+.staff-empty strong { margin-bottom: .4rem; color: var(--navy); }
+.staff-inventory-form { display: grid; grid-template-columns: 2fr 1fr 1fr auto; align-items: end; gap: 1rem; border-radius: 16px; padding: 1.2rem; background: var(--blue-soft); }
+.staff-inventory-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: .85rem; margin-top: 1.3rem; }
+.staff-stock-card { border: 1px solid var(--line); border-radius: 14px; padding: 1rem; background: #fbfcfe; }
+.staff-stock-card h3 { margin: 0 0 .75rem; color: var(--navy); }
+.staff-stock-row { display: grid; grid-template-columns: 42px 1fr auto; align-items: center; gap: .7rem; border-top: 1px solid #e7ebf1; padding: .55rem 0; color: var(--muted); font-size: .82rem; }
+.staff-stock-row b { color: var(--navy); }
+.stock-meter { height: 7px; overflow: hidden; border-radius: 999px; background: #e4e9f0; }
+.stock-meter i { display: block; height: 100%; border-radius: inherit; background: var(--blue); }
+.staff-stock-row.low .stock-meter i { background: #d59e00; }
+.staff-stock-row.empty .stock-meter i { background: #bc3345; }
+
+@media (max-width: 980px) {
+  .staff-topbar { grid-template-columns: auto 1fr auto; }
+  .staff-nav { grid-column: 1 / -1; grid-row: 2; overflow-x: auto; justify-content: flex-start; }
+  .staff-metrics { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .staff-inventory-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+@media (max-width: 700px) {
+  .staff-topbar { grid-template-columns: 1fr auto; }
+  .staff-topbar > .secondary { display: none; }
+  .staff-nav { grid-column: 1 / -1; }
+  .staff-nav button { white-space: nowrap; }
+  .staff-welcome, .staff-section-heading { align-items: flex-start; flex-direction: column; }
+  .staff-metrics, .staff-inventory-grid { grid-template-columns: 1fr; }
+  .staff-record { grid-template-columns: 1fr; }
+  .staff-record-actions { width: 100%; align-items: stretch; }
+  .staff-inventory-form { grid-template-columns: 1fr; }
+}

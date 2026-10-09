@@ -56,6 +56,7 @@ function createKioskServer(options = {}) {
   const adminPin = String(options.adminPin ?? process.env.CUTTE_ADMIN_PIN ?? '2468');
   const sessions = new Map();
   const assist = { sequence: 0, requestedAt: null };
+  const hardware = { indicator: null, updatedAt: null };
 
   function sessionFor(request) {
     const token = parseCookies(request.headers.cookie).cutte_session;
@@ -90,12 +91,24 @@ function createKioskServer(options = {}) {
         serveFile(response, 'index.html', 'text/html; charset=utf-8');
         return;
       }
+      if (request.method === 'GET' && url.pathname === '/staff.html') {
+        serveFile(response, 'staff.html', 'text/html; charset=utf-8');
+        return;
+      }
       if (request.method === 'GET' && url.pathname === '/styles.css') {
         serveFile(response, 'styles.css', 'text/css; charset=utf-8');
         return;
       }
+      if (request.method === 'GET' && url.pathname === '/staff.css') {
+        serveFile(response, 'staff.css', 'text/css; charset=utf-8');
+        return;
+      }
       if (request.method === 'GET' && url.pathname === '/app.js') {
         serveFile(response, 'app.js', 'text/javascript; charset=utf-8');
+        return;
+      }
+      if (request.method === 'GET' && ['/staff.js', '/supabase-config.js', '/univue-data.js'].includes(url.pathname)) {
+        serveFile(response, url.pathname.slice(1), 'text/javascript; charset=utf-8');
         return;
       }
       if (request.method === 'GET' && /^\/images\/(?:products|branding)\/[a-z0-9-]+\.(?:svg|png|jpe?g)$/.test(url.pathname)) {
@@ -121,6 +134,8 @@ function createKioskServer(options = {}) {
           controller: 'SIMULATOR',
           assistanceSequence: assist.sequence,
           assistanceRequestedAt: assist.requestedAt,
+          hardwareIndicator: hardware.indicator,
+          hardwareUpdatedAt: hardware.updatedAt,
           authenticated: Boolean(sessionFor(request))
         });
         return;
@@ -162,6 +177,22 @@ function createKioskServer(options = {}) {
         json(response, 200, { assistanceSequence: assist.sequence });
         return;
       }
+      if (request.method === 'POST' && url.pathname === '/hardware/indicator') {
+        const body = await readJson(request);
+        if (!['AVAILABLE', 'LOW_STOCK', 'OUT_OF_STOCK'].includes(body.status)) {
+          json(response, 400, { error: 'BAD_STATUS' });
+          return;
+        }
+        hardware.indicator = {
+          item: String(body.item || ''),
+          size: String(body.size || ''),
+          quantity: Number(body.quantity),
+          status: body.status
+        };
+        hardware.updatedAt = new Date().toISOString();
+        json(response, 200, { confirmed: true, ...hardware.indicator });
+        return;
+      }
       json(response, 404, { error: 'NOT_FOUND' });
     } catch (error) {
       const known = ['UNKNOWN_ITEM', 'UNKNOWN_SIZE', 'BAD_QUANTITY'];
@@ -170,7 +201,7 @@ function createKioskServer(options = {}) {
     }
   });
 
-  return { server, inventory, assist };
+  return { server, inventory, assist, hardware };
 }
 
 if (require.main === module) {

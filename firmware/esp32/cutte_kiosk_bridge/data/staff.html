@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1f3a">
+  <title>UNIVUE Staff | NU Baliwag</title>
+  <meta name="description" content="UNIVUE staff dashboard for assistance requests, orders, payments, receipts, and size-level uniform inventory.">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230b1f3a'/%3E%3Cpath d='M16 15v22c0 11 6 16 16 16s16-5 16-16V15h-9v22c0 5-2 8-7 8s-7-3-7-8V15z' fill='%23ffcc00'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/staff.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
+  <script src="/supabase-config.js" defer></script>
+  <script src="/univue-data.js" defer></script>
+  <script src="/staff.js" defer></script>
+</head>
+<body class="staff-body">
+  <a class="skip-link" href="#staff-main">Skip to staff workspace</a>
+  <div class="utility-bar"><span>UNIVUE staff workspace · NU Baliwag</span><span id="staff-live-status" class="utility-status">Database: checking…</span></div>
+  <header class="staff-topbar">
+    <a class="brand" href="./index.html" aria-label="Open UNIVUE student kiosk"><img class="brand-logo" src="/images/branding/nu-shield.png" alt=""><span class="brand-copy"><strong>UNIVUE Staff</strong><small>NU Baliwag · Bulldogs Exchange</small></span></a>
+    <nav id="staff-nav" class="staff-nav" aria-label="Staff workspace" hidden>
+      <button class="active" type="button" data-panel="assistance">Assistance <strong id="nav-assistance-count">0</strong></button>
+      <button type="button" data-panel="orders">Orders <strong id="nav-order-count">0</strong></button>
+      <button type="button" data-panel="inventory">Inventory</button>
+    </nav>
+    <a class="secondary compact" href="./index.html">Student kiosk</a>
+    <button id="staff-logout" class="admin-button" type="button" hidden>Log out</button>
+  </header>
+
+  <main id="staff-main" class="staff-main">
+    <section id="staff-login" class="auth-card staff-login-card">
+      <div class="auth-brand"><img class="brand-logo" src="/images/branding/nu-shield.png" alt=""><p><strong>Authorized staff only</strong><small>Supabase-protected UNIVUE access</small></p></div>
+      <p class="eyebrow">Staff sign in</p>
+      <h1>Open the live workspace</h1>
+      <p class="hint">Use the email and password created for your NU Baliwag staff account. Student kiosk users do not need an account.</p>
+      <form id="staff-login-form" class="form-stack">
+        <label for="staff-email">Staff email<input id="staff-email" name="email" type="email" autocomplete="username" required placeholder="staff@school.edu.ph"></label>
+        <label for="staff-password">Password<input id="staff-password" name="password" type="password" autocomplete="current-password" minlength="8" required placeholder="Enter password"></label>
+        <p id="staff-login-error" class="field-error" role="alert" hidden></p>
+        <button id="staff-login-button" class="primary large" type="submit">Sign in securely</button>
+      </form>
+    </section>
+
+    <section id="staff-unauthorized" class="auth-card staff-login-card" hidden>
+      <p class="eyebrow">Account not assigned</p>
+      <h1>Staff access is not enabled</h1>
+      <p class="hint">This Supabase account exists, but it has no active UNIVUE staff profile. Ask the system administrator to add it to <code>staff_profiles</code>.</p>
+      <button class="secondary" type="button" data-action="return-login">Return to sign in</button>
+    </section>
+
+    <section id="staff-dashboard" hidden>
+      <div class="staff-welcome">
+        <div><p class="eyebrow">Live operations</p><h1>Good day, <span id="staff-name">Staff</span>.</h1><p>Assistance calls, orders, payments, and size-level stock update here.</p></div>
+        <button id="refresh-dashboard" class="secondary" type="button">Refresh data</button>
+      </div>
+
+      <div class="staff-metrics" aria-label="UNIVUE status summary">
+        <article><span>Waiting for help</span><strong id="metric-assistance">0</strong><small>Pending assistance requests</small></article>
+        <article><span>Awaiting payment</span><strong id="metric-orders">0</strong><small>Orders needing confirmation</small></article>
+        <article><span>Low or empty</span><strong id="metric-low-stock">0</strong><small>Item and size combinations</small></article>
+        <article><span>Database</span><strong id="metric-database">Live</strong><small id="metric-updated">Connecting…</small></article>
+      </div>
+
+      <section class="staff-panel" data-staff-panel="assistance">
+        <div class="staff-section-heading"><div><p class="eyebrow">Physical help button</p><h2>Assistance queue</h2><p>New calls appear here in real time. Acknowledge first, then resolve after helping the student.</p></div><span class="live-chip"><i></i> Live</span></div>
+        <div id="assistance-list" class="staff-card-list"></div>
+        <div id="assistance-empty" class="staff-empty" hidden><strong>No pending assistance calls</strong><span>New physical-button or on-screen requests will appear automatically.</span></div>
+      </section>
+
+      <section class="staff-panel" data-staff-panel="orders" hidden>
+        <div class="staff-section-heading"><div><p class="eyebrow">Checkout and payment</p><h2>Recent orders</h2><p>Confirm payment, prepare the order, and move it through fulfillment.</p></div><span class="live-chip"><i></i> Live</span></div>
+        <div id="orders-list" class="staff-card-list"></div>
+        <div id="orders-empty" class="staff-empty" hidden><strong>No orders yet</strong><span>Completed student checkouts will appear here.</span></div>
+      </section>
+
+      <section class="staff-panel" data-staff-panel="inventory" hidden>
+        <div class="staff-section-heading"><div><p class="eyebrow">Maximum 30 per size</p><h2>Inventory manager</h2><p>Enter the physically counted replacement quantity. Saving updates the kiosk immediately.</p></div><span class="live-chip"><i></i> Live</span></div>
+        <form id="staff-inventory-form" class="staff-inventory-form">
+          <label for="staff-product">Product<select id="staff-product" required></select></label>
+          <label for="staff-size">Size<select id="staff-size" required><option>XS</option><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option></select></label>
+          <label for="staff-quantity">Verified quantity<input id="staff-quantity" type="number" min="0" max="30" step="1" required></label>
+          <button class="primary" type="submit">Save live quantity</button>
+        </form>
+        <p id="staff-inventory-message" class="form-message" role="status" aria-live="polite"></p>
+        <div id="inventory-grid" class="staff-inventory-grid"></div>
+      </section>
+    </section>
+  </main>
+
+  <div id="staff-toast" class="cart-toast" role="status" aria-live="polite" hidden></div>
+  <footer><div class="footer-brand"><img class="brand-logo small" src="/images/branding/nu-shield.png" alt=""><p><strong>UNIVUE · Uniform View</strong><small>Authorized NU Baliwag staff workspace</small></p></div><p>Realtime assistance • Order confirmation • Payment records • Inventory control.</p></footer>
+</body>
+</html>

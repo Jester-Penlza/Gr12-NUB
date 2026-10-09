@@ -2,7 +2,9 @@
 
 const SIZES = Object.freeze(['XS', 'S', 'M', 'L', 'XL', 'XXL']);
 const MAX_QUANTITY = 30;
-const STATIC_DEMO_MODE = document.documentElement.dataset.runtime === 'github-pages';
+const DATA = window.UNIVUE_DATA;
+const LIVE_DATABASE_MODE = Boolean(DATA?.isReady());
+const STATIC_DEMO_MODE = document.documentElement.dataset.runtime === 'github-pages' && !LIVE_DATABASE_MODE;
 const DEMO_INVENTORY_KEY = 'cutte_github_demo_inventory_v1';
 const DEMO_SESSION_KEY = 'cutte_github_demo_admin';
 
@@ -21,13 +23,13 @@ const PRODUCT_META = Object.freeze({
     image: '/images/products/male-polo.png',
     price: 450,
     categoryLabel: 'Male formal uniform',
-    description: 'Official male school polo. Select a size to request its current quantity from the stock controller.'
+    description: 'Official male school polo. Select a size to request its current quantity from the live UNIVUE database.'
   },
   FEMALE_BLOUSE: {
     image: '/images/products/female-blouse.png',
     price: 450,
     categoryLabel: 'Female formal uniform',
-    description: 'Official female school blouse. Select a size to request its current quantity from the stock controller.'
+    description: 'Official female school blouse. Select a size to request its current quantity from the live UNIVUE database.'
   },
   MALE_PANTS: {
     image: '/images/products/male-pants.png',
@@ -64,6 +66,8 @@ const state = {
   assistanceSequence: null,
   adminCurrentKey: null,
   lastStockResult: null,
+  lastOrderReference: null,
+  assistanceRequest: null,
   stockVisible: true,
   cart: loadStoredCart()
 };
@@ -111,6 +115,15 @@ function showToast(message) {
   toast.hidden = false;
   clearTimeout(showToast.timer);
   showToast.timer = setTimeout(() => { toast.hidden = true; }, 2600);
+}
+
+function speak(message) {
+  if (!('speechSynthesis' in window) || !message) return;
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(message);
+  utterance.lang = 'en-PH';
+  utterance.rate = 0.95;
+  window.speechSynthesis.speak(utterance);
 }
 
 function showScreen(name) {
@@ -251,9 +264,11 @@ function renderSizeStockCards(sizes, item) {
 
 async function loadSizeStockOverview(item) {
   renderSizeStockCards([], item);
-  byId('size-stock-message').textContent = 'Reading all six size quantities from the stock controller…';
+  byId('size-stock-message').textContent = 'Reading all six size quantities from UNIVUE…';
   try {
-    const result = await requestJson(`/inventory?item=${encodeURIComponent(item)}`, {}, 14000);
+    const result = LIVE_DATABASE_MODE
+      ? { item, maxQuantity: MAX_QUANTITY, sizes: await DATA.inventoryOverview(item) }
+      : await requestJson(`/inventory?item=${encodeURIComponent(item)}`, {}, 14000);
     if (state.item !== item) return;
     if (result.item !== item || result.maxQuantity !== MAX_QUANTITY || !Array.isArray(result.sizes) || result.sizes.length !== SIZES.length) {
       throw new Error('BAD_RESPONSE');
@@ -278,7 +293,7 @@ function showSize() {
   byId('size-step').textContent = state.category === 'FORMAL' ? 'Step 4 of 5' : 'Step 2 of 4';
   byId('detail-category').textContent = meta.categoryLabel;
   byId('detail-description').textContent = meta.description;
-  byId('detail-price').textContent = `${currency.format(meta.price)} · demo price`;
+  byId('detail-price').textContent = `${currency.format(meta.price)} · current catalog price`;
   byId('detail-image').src = meta.image;
   byId('detail-image').alt = `${itemLabel(state.item)} product photograph`;
   byId('detail-image-label').textContent = 'Bulldogs Exchange';
@@ -409,12 +424,16 @@ async function requestJson(url, options = {}, timeoutMs = 5000) {
 }
 
 function friendlyError(error) {
-  if (error.name === 'AbortError' || error.message === 'TIMEOUT') return 'The Arduino controller did not respond before the timeout.';
+  if (error.name === 'AbortError' || error.message === 'TIMEOUT') return 'The stock service did not respond before the timeout.';
   if (error.message === 'UNKNOWN_ITEM') return 'The selected item was not recognized by the controller.';
   if (error.message === 'UNKNOWN_SIZE') return 'The selected size was not recognized by the controller.';
   if (error.message === 'BAD_QUANTITY') return `Enter a whole number from 0 to ${MAX_QUANTITY}.`;
   if (error.message === 'UNAUTHORIZED' || error.status === 401) return 'Your administrator session expired. Log in again.';
-  return 'The kiosk received an invalid or unavailable controller response.';
+  if (error.message === 'SUPABASE_UNAVAILABLE') return 'The UNIVUE database connection is unavailable.';
+  if (error.message === 'STOCK_NOT_FOUND') return 'No inventory record exists for that item and size.';
+  if (error.message.includes('INSUFFICIENT_STOCK')) return 'One or more items no longer have enough stock for this order.';
+  if (error.message.includes('UNKNOWN_KIOSK')) return 'This kiosk is not registered in UNIVUE.';
+  return 'UNIVUE received an invalid response or could not reach the live stock database.';
 }
 
 async function checkStock() {
@@ -422,11 +441,14 @@ async function checkStock() {
   state.lastAction = checkStock;
   showScreen('loading');
   try {
-    const result = await requestJson(`/check?item=${encodeURIComponent(state.item)}&size=${encodeURIComponent(state.size)}`);
+    const result = LIVE_DATABASE_MODE
+      ? await DATA.checkInventory(state.item, state.size)
+      : await requestJson(`/check?item=${encodeURIComponent(state.item)}&size=${encodeURIComponent(state.size)}`);
     if (result.item !== state.item || result.size !== state.size || !Number.isInteger(result.quantity)) {
       throw new Error('BAD_RESPONSE');
     }
     state.lastStockResult = result;
+    signalPhysicalIndicator(result);
     renderResult(result);
   } catch (error) {
     byId('error-message').textContent = friendlyError(error);
@@ -434,13 +456,23 @@ async function checkStock() {
   }
 }
 
+function signalPhysicalIndicator(result) {
+  if (!['localhost', '127.0.0.1'].includes(window.location.hostname)) return;
+  const baseUrl = DATA?.config?.hardwareBaseUrl || '';
+  fetch(`${baseUrl}/hardware/indicator`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ item: result.item, size: result.size, quantity: result.quantity, status: result.status })
+  }).catch(() => { /* the database result remains valid if optional GPIO output is unavailable */ });
+}
+
 function renderResult(result) {
   const display = statusDisplay(result.status);
   if (!display) throw new Error('BAD_RESPONSE');
   const hardwareGuidance = {
-    AVAILABLE: 'Stock is available for this size. The Arduino has updated the physical status LED.',
-    LOW_STOCK: 'Only 1–3 units remain. The Arduino has updated the physical status LED so staff can act early.',
-    OUT_OF_STOCK: 'No units remain for this size. The Arduino has updated the physical status LED.'
+    AVAILABLE: 'Stock is available for this size. The Raspberry Pi can show the matching physical LED status.',
+    LOW_STOCK: 'Only 1–3 units remain. The Raspberry Pi can show the matching physical LED so staff can act early.',
+    OUT_OF_STOCK: 'No units remain for this size. The Raspberry Pi can show the out-of-stock physical LED.'
   }[result.status];
   const demoGuidance = {
     AVAILABLE: 'Stock is available for this size in the online demonstration.',
@@ -460,6 +492,7 @@ function renderResult(result) {
   addButton.disabled = result.quantity < 1;
   addButton.textContent = result.quantity < 1 ? 'Out of stock' : `Add to cart · ${currency.format(PRODUCT_META[result.item].price)}`;
   showScreen('result');
+  speak(`${itemLabel(result.item)}, size ${result.size}. ${display.label}. ${result.quantity} units available.`);
 }
 
 function addCurrentToCart() {
@@ -550,16 +583,18 @@ async function placeOrder(event) {
   const submit = byId('place-order');
   const message = byId('checkout-message');
   submit.disabled = true;
-  message.textContent = 'Rechecking every cart item with the stock controller…';
+  message.textContent = 'Rechecking stock and creating the UNIVUE order…';
   try {
-    for (const line of state.cart) {
-      const result = await requestJson(`/check?item=${encodeURIComponent(line.item)}&size=${encodeURIComponent(line.size)}`);
-      if (!Number.isInteger(result.quantity) || result.quantity < line.quantity) {
-        throw new Error(`INSUFFICIENT_STOCK:${line.item}:${line.size}:${result.quantity ?? 0}`);
+    if (!LIVE_DATABASE_MODE) {
+      for (const line of state.cart) {
+        const result = await requestJson(`/check?item=${encodeURIComponent(line.item)}&size=${encodeURIComponent(line.size)}`);
+        if (!Number.isInteger(result.quantity) || result.quantity < line.quantity) {
+          throw new Error(`INSUFFICIENT_STOCK:${line.item}:${line.size}:${result.quantity ?? 0}`);
+        }
       }
     }
     const order = {
-      reference: `BDEX-${new Date().toISOString().slice(2, 10).replaceAll('-', '')}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
+      reference: `UNIVUE-${new Date().toISOString().slice(2, 10).replaceAll('-', '')}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
       customerName: String(form.get('customerName') || '').trim(),
       studentId: String(form.get('studentId') || '').trim(),
       collegeDepartment: String(form.get('collegeDepartment') || '').trim(),
@@ -572,9 +607,17 @@ async function placeOrder(event) {
       createdAt: new Date().toISOString(),
       status: 'AWAITING_COUNTER_PAYMENT'
     };
+    if (LIVE_DATABASE_MODE) {
+      const created = await DATA.placeOrder(order);
+      order.id = created.id;
+      order.reference = created.reference;
+      order.total = Number(created.total);
+      order.status = created.status;
+    }
     saveOrder(order);
+    state.lastOrderReference = order.reference;
     byId('order-reference').textContent = order.reference;
-    byId('order-payment').textContent = order.paymentMethod === 'CASH' ? 'Cash at pickup' : 'GCash at the school counter';
+    byId('order-payment').textContent = order.paymentMethod === 'CASH' ? 'Cash · awaiting staff confirmation' : 'GCash QR · awaiting staff confirmation';
     byId('order-fulfillment').textContent = order.fulfillment === 'CAMPUS_DELIVERY' ? 'Campus delivery requested' : 'Pickup at the merchandise office';
     byId('order-success-items').innerHTML = order.items.map((line) => `<div><span>${itemLabel(line.item)} · ${line.size} × ${line.quantity}</span><strong>${currency.format(line.unitPrice * line.quantity)}</strong></div>`).join('') + `<div class="receipt-total"><span>Total due</span><strong>${currency.format(order.total)}</strong></div>`;
     state.cart = [];
@@ -582,7 +625,7 @@ async function placeOrder(event) {
     formElement.reset();
     showScreen('order-success');
   } catch (error) {
-    if (error.message.startsWith('INSUFFICIENT_STOCK:')) {
+    if (error.message.startsWith('INSUFFICIENT_STOCK:') && error.message.split(':').length >= 4) {
       const [, item, size, available] = error.message.split(':');
       message.textContent = `${itemLabel(item)} · ${size} now has only ${available} available. Update the cart before placing the order.`;
     } else {
@@ -594,12 +637,67 @@ async function placeOrder(event) {
 }
 
 async function openAdmin() {
+  if (LIVE_DATABASE_MODE) {
+    window.location.href = './staff.html';
+    return;
+  }
   try {
     const status = await requestJson('/status');
     showScreen(status.authenticated ? 'admin-inventory' : 'admin-login');
   } catch {
     showScreen('admin-login');
   }
+}
+
+async function requestAssistance() {
+  const button = document.querySelector('[data-action="request-assistance"]');
+  const banner = byId('assist-banner');
+  button.disabled = true;
+  banner.hidden = false;
+  byId('assist-title').textContent = 'Contacting staff…';
+  byId('assist-message').textContent = 'Please remain near the kiosk.';
+  try {
+    if (LIVE_DATABASE_MODE) {
+      state.assistanceRequest = await DATA.requestAssistance({
+        item: state.item,
+        size: state.size,
+        orderReference: state.lastOrderReference
+      });
+      byId('assist-title').textContent = 'Assistance requested.';
+      byId('assist-message').textContent = 'The UNIVUE staff dashboard has been notified.';
+      speak('Assistance requested. A staff member has been notified.');
+    } else {
+      await postJson('/simulate/assist', {});
+      byId('assist-title').textContent = 'Assistance requested.';
+      byId('assist-message').textContent = 'The local kiosk controller has recorded the request.';
+    }
+  } catch (error) {
+    byId('assist-title').textContent = 'Could not notify staff.';
+    byId('assist-message').textContent = friendlyError(error);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function refreshAssistanceStatus() {
+  if (!LIVE_DATABASE_MODE || !state.assistanceRequest) return;
+  try {
+    const current = await DATA.assistanceStatus(state.assistanceRequest.id, state.assistanceRequest.accessToken);
+    if (!current) return;
+    const changed = current.status !== state.assistanceRequest.status;
+    state.assistanceRequest.status = current.status;
+    if (current.status === 'ACKNOWLEDGED') {
+      byId('assist-title').textContent = 'Staff acknowledged your request.';
+      byId('assist-message').textContent = 'A staff member is on the way.';
+      if (changed) speak('A staff member acknowledged your request and is on the way.');
+    } else if (current.status === 'RESOLVED') {
+      byId('assist-title').textContent = 'Assistance completed.';
+      byId('assist-message').textContent = 'Thank you. You may continue using UNIVUE.';
+      state.assistanceRequest = null;
+      clearTimeout(refreshAssistanceStatus.hideTimer);
+      refreshAssistanceStatus.hideTimer = setTimeout(() => { byId('assist-banner').hidden = true; }, 6000);
+    }
+  } catch { /* the next status poll can recover */ }
 }
 
 function postJson(url, body) {
@@ -710,6 +808,11 @@ async function logout() {
 }
 
 async function pollStatus() {
+  if (LIVE_DATABASE_MODE) {
+    byId('controller-state').textContent = `UNIVUE database: live · ${DATA.config.kioskCode}`;
+    await refreshAssistanceStatus();
+    return;
+  }
   try {
     const status = await requestJson('/status', {}, 2500);
     byId('controller-state').textContent = `Controller status: ${status.controller}`;
@@ -758,6 +861,7 @@ document.addEventListener('click', (event) => {
     'add-to-cart': addCurrentToCart,
     'start-check': () => { resetStudent(); showScreen('category'); },
     'open-admin': openAdmin,
+    'request-assistance': requestAssistance,
     'back-category': () => showScreen('category'),
     'back-gender': () => showScreen('gender'),
     'back-from-size': () => showScreen(state.category === 'FORMAL' ? 'garment' : 'category'),
@@ -775,6 +879,34 @@ document.addEventListener('click', (event) => {
 byId('login-form').addEventListener('submit', login);
 byId('inventory-form').addEventListener('submit', saveQuantity);
 byId('checkout-form').addEventListener('submit', placeOrder);
+byId('product-search').addEventListener('input', (event) => {
+  const query = event.currentTarget.value.trim().toLowerCase();
+  let visible = 0;
+  for (const card of document.querySelectorAll('[data-product-card]')) {
+    const matches = !query || card.dataset.search.includes(query);
+    card.hidden = !matches;
+    if (matches) visible += 1;
+  }
+  byId('product-search-status').textContent = query
+    ? `${visible} product${visible === 1 ? '' : 's'} found`
+    : 'Showing all 6 products';
+});
+byId('checkout-form').addEventListener('change', (event) => {
+  if (event.target.name !== 'paymentMethod') return;
+  const isGcash = event.target.value === 'GCASH';
+  const panel = byId('gcash-qr-panel');
+  panel.hidden = !isGcash;
+  if (!isGcash) return;
+  const configuredImage = DATA?.config?.gcashQrImageUrl;
+  const image = byId('gcash-qr-image');
+  if (configuredImage) {
+    image.src = configuredImage;
+    byId('gcash-qr-message').textContent = 'Scan only the official NU Baliwag QR, then show the successful payment to staff for confirmation.';
+  } else {
+    image.removeAttribute('src');
+    byId('gcash-qr-message').textContent = 'The school has not configured its official GCash QR yet. Staff can present the verified QR at the counter.';
+  }
+});
 byId('admin-category').addEventListener('change', () => {
   byId('admin-gender').value = '';
   populateAdminItems();
@@ -783,7 +915,7 @@ byId('admin-gender').addEventListener('change', populateAdminItems);
 byId('admin-item').addEventListener('change', resetAdminCurrent);
 byId('admin-size').addEventListener('change', resetAdminCurrent);
 
-if (STATIC_DEMO_MODE) byId('deployment-note').hidden = false;
+if (!LIVE_DATABASE_MODE) byId('deployment-note').hidden = false;
 renderCart();
 pollStatus();
 setInterval(pollStatus, 2000);
