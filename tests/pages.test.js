@@ -43,6 +43,10 @@ test('GitHub Pages build contains the UNIVUE kiosk, staff portal, and live Supab
   assert.match(staffApp, /loginForm\.reset\(\);/);
   assert.doesNotMatch(staffApp, /await[\s\S]{0,500}event\.currentTarget\.reset\(\)/);
   assert.match(staffApp, /Waiting for PayMongo verification/);
+  assert.match(staff, /id="staff-sound-toggle"/);
+  assert.match(staffApp, /function playAssistanceAlert/);
+  assert.match(staffApp, /payload\?\.eventType === 'INSERT'/);
+  assert.match(staffApp, /New assistance call received/);
 });
 
 test('PayMongo integration keeps secret keys server-side and verifies signed webhooks', () => {

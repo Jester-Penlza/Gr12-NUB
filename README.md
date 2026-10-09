@@ -58,7 +58,9 @@ The PayMongo integration is currently configured with test credentials. Secrets 
 
 ## Assistance button and Raspberry Pi
 
-The on-screen **Need help?** button creates a realtime assistance request. The service in `hardware/pi/` sends the same request when the physical GPIO button is pressed and can drive the three status LEDs, buzzer, and optional receipt printer. Staff can acknowledge and resolve the request in `/staff.html`; the student kiosk displays the updated status.
+The on-screen **Need help?** button creates a realtime assistance request. The service in `hardware/pi/` sends the same request directly to Supabase when the physical GPIO button is pressed, so this function works whether the kiosk opens the deployed website or a local copy. The Pi buzzer chirps at the kiosk, while the staff dashboard shows a realtime toast, vibration on supported devices, and an optional two-tone speaker alert. Staff can acknowledge and resolve the request in `/staff.html`; the student kiosk displays the updated status.
+
+The current thermal-printer trigger runs after staff confirms a cash payment. It prints through the Pi's loopback hardware service when the staff page is running on that same Pi. For a staff computer and printer-connected kiosk in different locations, use a device-authenticated Supabase print queue rather than exposing the Pi's local hardware port.
 
 GPIO on the Raspberry Pi is 3.3 V only. Use the correct resistor, driver, and power arrangement for LEDs, speakers, buzzers, and printers. Hardware behavior must be validated on the actual device before claiming the physical prototype is complete.
 

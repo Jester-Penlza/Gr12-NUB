@@ -9,6 +9,8 @@ const root = path.resolve(__dirname, '..');
 const arduino = fs.readFileSync(path.join(root, 'firmware', 'arduino', 'cutte_stock_controller', 'cutte_stock_controller.ino'), 'utf8');
 const esp32 = fs.readFileSync(path.join(root, 'firmware', 'esp32', 'cutte_kiosk_bridge', 'cutte_kiosk_bridge.ino'), 'utf8');
 const app = fs.readFileSync(path.join(root, 'firmware', 'esp32', 'cutte_kiosk_bridge', 'data', 'app.js'), 'utf8');
+const config = fs.readFileSync(path.join(root, 'firmware', 'esp32', 'cutte_kiosk_bridge', 'data', 'supabase-config.js'), 'utf8');
+const piService = fs.readFileSync(path.join(root, 'hardware', 'pi', 'univue_hardware_service.py'), 'utf8');
 
 test('Arduino firmware preserves the fixed inventory order and 6x6 layout', () => {
   assert.match(arduino, /ITEM_COUNT = 6/);
@@ -50,4 +52,15 @@ test('web logic keeps formal garments gender-filtered and unisex items gender-fr
   assert.match(app, /\/inventory\?item=/);
   assert.match(app, /LIVE_DATABASE_MODE/);
   assert.match(app, /DATA\.checkInventory/);
+});
+
+test('Raspberry Pi service connects the physical assistance button, buzzer, Supabase, and local bridge', () => {
+  assert.match(piService, /UNIVUE_ASSIST_BUTTON_PIN.*"17"/);
+  assert.match(piService, /UNIVUE_BUZZER_PIN.*"23"/);
+  assert.match(piService, /self\.button\.when_pressed = self\._button_pressed/);
+  assert.match(piService, /self\.buzzer\.on\(\)[\s\S]*self\.buzzer\.off\(\)/);
+  assert.match(piService, /rest\/v1\/rpc\/request_assistance/);
+  assert.match(piService, /"Authorization": f"Bearer \{SUPABASE_KEY\}"/);
+  assert.match(piService, /\/hardware\/print-receipt/);
+  assert.match(config, /http:\/\/127\.0\.0\.1:8787/);
 });

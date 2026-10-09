@@ -4,7 +4,15 @@ const DATA = window.UNIVUE_DATA;
 const byId = (id) => document.getElementById(id);
 const currency = new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 });
 const dateTime = new Intl.DateTimeFormat('en-PH', { dateStyle: 'medium', timeStyle: 'short' });
-const state = { profile: null, snapshot: null, unsubscribe: null, refreshTimer: null };
+const state = {
+  profile: null,
+  snapshot: null,
+  unsubscribe: null,
+  refreshTimer: null,
+  pendingAssistanceAlert: false,
+  alertSoundEnabled: false,
+  audioContext: null
+};
 
 function showToast(message) {
   const toast = byId('staff-toast');
@@ -12,6 +20,58 @@ function showToast(message) {
   toast.hidden = false;
   clearTimeout(showToast.timer);
   showToast.timer = setTimeout(() => { toast.hidden = true; }, 3200);
+}
+
+function updateAlertSoundButton() {
+  const button = byId('staff-sound-toggle');
+  button.setAttribute('aria-pressed', String(state.alertSoundEnabled));
+  button.textContent = state.alertSoundEnabled ? 'Alert sound on' : 'Enable alert sound';
+}
+
+async function enableAlertSound({ confirmWithTone = true } = {}) {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) {
+    showToast('This browser does not support audible staff alerts.');
+    return false;
+  }
+  state.audioContext ||= new AudioContextClass();
+  if (state.audioContext.state === 'suspended') await state.audioContext.resume();
+  state.alertSoundEnabled = state.audioContext.state === 'running';
+  updateAlertSoundButton();
+  if (state.alertSoundEnabled && confirmWithTone) {
+    playAssistanceAlert();
+    showToast('Assistance alert sound enabled.');
+  }
+  return state.alertSoundEnabled;
+}
+
+async function toggleAlertSound() {
+  if (state.alertSoundEnabled) {
+    state.alertSoundEnabled = false;
+    updateAlertSoundButton();
+    showToast('Assistance alert sound muted.');
+    return;
+  }
+  await enableAlertSound();
+}
+
+function playAssistanceAlert() {
+  const context = state.audioContext;
+  if (!state.alertSoundEnabled || !context || context.state !== 'running') return;
+  const start = context.currentTime;
+  for (const offset of [0, 0.2]) {
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(880, start + offset);
+    gain.gain.setValueAtTime(0.0001, start + offset);
+    gain.gain.exponentialRampToValueAtTime(0.16, start + offset + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + offset + 0.13);
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    oscillator.start(start + offset);
+    oscillator.stop(start + offset + 0.14);
+  }
 }
 
 function showLogin(error = '') {
@@ -205,12 +265,18 @@ async function refreshSnapshot({ quiet = false } = {}) {
   }
 }
 
-function scheduleRefresh(table) {
+function scheduleRefresh(table, payload) {
+  if (table === 'assistance_requests' && payload?.eventType === 'INSERT') {
+    state.pendingAssistanceAlert = true;
+  }
   clearTimeout(state.refreshTimer);
   state.refreshTimer = setTimeout(async () => {
+    const shouldAlert = state.pendingAssistanceAlert;
+    state.pendingAssistanceAlert = false;
     await refreshSnapshot({ quiet: true });
-    if (table === 'assistance_requests') {
-      showToast('New assistance activity received.');
+    if (shouldAlert) {
+      showToast('New assistance call received.');
+      playAssistanceAlert();
       if ('vibrate' in navigator) navigator.vibrate([120, 80, 120]);
     }
   }, 250);
@@ -241,6 +307,7 @@ async function establishStaffSession() {
 
 byId('staff-login-form').addEventListener('submit', async (event) => {
   event.preventDefault();
+  enableAlertSound({ confirmWithTone: false }).catch(() => {});
   const loginForm = event.currentTarget;
   const button = byId('staff-login-button');
   const errorHost = byId('staff-login-error');
@@ -267,11 +334,16 @@ byId('staff-logout').addEventListener('click', async () => {
   state.unsubscribe = null;
   state.profile = null;
   state.snapshot = null;
+  state.pendingAssistanceAlert = false;
+  state.alertSoundEnabled = false;
+  state.audioContext?.close().catch(() => {});
+  state.audioContext = null;
   try { await DATA.signOut(); } catch { /* the local session still returns to login */ }
   showLogin();
 });
 
 byId('refresh-dashboard').addEventListener('click', () => refreshSnapshot());
+byId('staff-sound-toggle').addEventListener('click', () => toggleAlertSound());
 byId('staff-product').addEventListener('change', syncInventoryQuantity);
 byId('staff-size').addEventListener('change', syncInventoryQuantity);
 

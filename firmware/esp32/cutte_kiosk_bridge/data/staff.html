@@ -52,7 +52,7 @@
     <section id="staff-dashboard" hidden>
       <div class="staff-welcome">
         <div><p class="eyebrow">Live operations</p><h1>Good day, <span id="staff-name">Staff</span>.</h1><p>Assistance calls, orders, payments, and size-level stock update here.</p></div>
-        <button id="refresh-dashboard" class="secondary" type="button">Refresh data</button>
+        <div class="staff-welcome-actions"><button id="staff-sound-toggle" class="secondary" type="button" aria-pressed="false">Enable alert sound</button><button id="refresh-dashboard" class="secondary" type="button">Refresh data</button></div>
       </div>
 
       <div class="staff-metrics" aria-label="UNIVUE status summary">
@@ -63,7 +63,7 @@
       </div>
 
       <section class="staff-panel" data-staff-panel="assistance">
-        <div class="staff-section-heading"><div><p class="eyebrow">Physical help button</p><h2>Assistance queue</h2><p>New calls appear here in real time. Acknowledge first, then resolve after helping the student.</p></div><span class="live-chip"><i></i> Live</span></div>
+        <div class="staff-section-heading"><div><p class="eyebrow">Physical help button</p><h2>Assistance queue</h2><p>New calls appear here in real time with an on-screen notice, vibration when supported, and an audible alert when sound is enabled. Acknowledge first, then resolve after helping the student.</p></div><span class="live-chip"><i></i> Live</span></div>
         <div id="assistance-list" class="staff-card-list"></div>
         <div id="assistance-empty" class="staff-empty" hidden><strong>No pending assistance calls</strong><span>New physical-button or on-screen requests will appear automatically.</span></div>
       </section>

@@ -13,6 +13,8 @@
 .staff-welcome { display: flex; align-items: flex-end; justify-content: space-between; gap: 2rem; }
 .staff-welcome h1 { margin: .25rem 0 .55rem; color: var(--navy); font-size: clamp(2.1rem, 5vw, 4.2rem); line-height: .95; letter-spacing: -.045em; }
 .staff-welcome p { margin-bottom: 0; color: var(--muted); }
+.staff-welcome-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .65rem; }
+#staff-sound-toggle[aria-pressed="true"] { border-color: #88cda4; color: #176b3a; background: #e6f7ed; }
 .staff-metrics { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 1rem; margin: 2rem 0; }
 .staff-metrics article { min-height: 150px; display: flex; flex-direction: column; justify-content: space-between; border: 1px solid var(--line); border-radius: 18px; padding: 1.2rem; background: white; box-shadow: var(--shadow-sm); }
 .staff-metrics span { color: var(--muted); font-size: .75rem; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; }
@@ -60,6 +62,7 @@
   .staff-nav { grid-column: 1 / -1; }
   .staff-nav button { white-space: nowrap; }
   .staff-welcome, .staff-section-heading { align-items: flex-start; flex-direction: column; }
+  .staff-welcome-actions { width: 100%; justify-content: flex-start; }
   .staff-metrics, .staff-inventory-grid { grid-template-columns: 1fr; }
   .staff-record { grid-template-columns: 1fr; }
   .staff-record-actions { width: 100%; align-items: stretch; }

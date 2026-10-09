@@ -82,7 +82,11 @@ class Hardware:
         request = urllib.request.Request(
             f"{SUPABASE_URL}/rest/v1/rpc/request_assistance",
             data=payload,
-            headers={"apikey": SUPABASE_KEY, "Content-Type": "application/json"},
+            headers={
+                "apikey": SUPABASE_KEY,
+                "Authorization": f"Bearer {SUPABASE_KEY}",
+                "Content-Type": "application/json",
+            },
             method="POST",
         )
         try:
