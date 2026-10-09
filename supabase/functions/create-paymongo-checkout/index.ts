@@ -7,6 +7,7 @@ const allowedOrigins = new Set([
   "http://localhost:4173",
   "http://localhost:8080",
 ]);
+const qrLifetimeSeconds = 1800;
 
 function corsHeaders(request: Request) {
   const origin = request.headers.get("origin") || "";
@@ -59,6 +60,28 @@ async function paymentSecrets() {
   return supabaseRpc("get_payment_server_secrets", {});
 }
 
+function isQrImage(value: unknown): value is string {
+  return typeof value === "string" && /^data:image\/(?:png|svg\+xml);base64,/i.test(value) && value.length < 100_000;
+}
+
+async function paymongoPost(path: string, key: string, body: unknown, idempotencyKey: string) {
+  const response = await fetch(`https://api.paymongo.com/v1/${path}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${btoa(`${key}:`)}`,
+      "Content-Type": "application/json",
+      "Idempotency-Key": idempotencyKey,
+    },
+    body: JSON.stringify(body),
+  });
+  const result = await response.json();
+  if (!response.ok) {
+    console.error("PayMongo QR request failed", path.split("/")[0], response.status, result?.errors?.map((entry: any) => entry?.code));
+    throw new Error(`PAYMONGO_REQUEST_FAILED:${response.status}`);
+  }
+  return result?.data;
+}
+
 Deno.serve(async (request: Request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders(request) });
   if (request.method !== "POST") return json(request, { error: "METHOD_NOT_ALLOWED" }, 405);
@@ -77,7 +100,7 @@ Deno.serve(async (request: Request) => {
 
     const orders = await supabaseGet(
       `orders?reference=eq.${encodeURIComponent(orderReference)}&payment_access_token=eq.${encodeURIComponent(accessToken)}` +
-      "&select=id,reference,total,status,payment_method,customer_name,contact_number&limit=1",
+      "&select=id,reference,total,status,payment_method,customer_name&limit=1",
     );
     const order = orders?.[0];
     if (!order || order.payment_method !== "GCASH" || order.status !== "AWAITING_PAYMENT") {
@@ -86,78 +109,104 @@ Deno.serve(async (request: Request) => {
 
     const payments = await supabaseGet(
       `payments?order_id=eq.${encodeURIComponent(order.id)}` +
-      "&select=status,provider_session_id,checkout_url&limit=1",
+      "&select=status,provider_session_id,provider_payment_method_id,provider_qr_image,provider_expires_at&limit=1",
     );
     const payment = payments?.[0];
     if (payment?.status === "CONFIRMED") return json(request, { error: "ORDER_ALREADY_PAID" }, 409);
-    if (payment?.provider_session_id && payment?.checkout_url) {
-      return json(request, { checkoutUrl: payment.checkout_url, sessionId: payment.provider_session_id, reused: true });
-    }
 
-    const items = await supabaseGet(
-      `order_items?order_id=eq.${encodeURIComponent(order.id)}` +
-      "&select=product_code,size,quantity,unit_price,products(name)",
-    );
-    if (!Array.isArray(items) || items.length === 0) throw new Error("ORDER_ITEMS_NOT_FOUND");
+    const storedExpiry = Date.parse(payment?.provider_expires_at || "");
+    if (
+      /^pi_[A-Za-z0-9]+$/.test(payment?.provider_session_id || "") &&
+      isQrImage(payment?.provider_qr_image) &&
+      Number.isFinite(storedExpiry) &&
+      storedExpiry > Date.now() + 30_000
+    ) {
+      return json(request, {
+        qrImageUrl: payment.provider_qr_image,
+        paymentIntentId: payment.provider_session_id,
+        expiresAt: payment.provider_expires_at,
+        reused: true,
+        testMode: true,
+      });
+    }
 
     const secrets = await paymentSecrets();
     const paymongoKey = Deno.env.get("PAYMONGO_SECRET_KEY_TEST") || secrets?.PAYMONGO_SECRET_KEY_TEST;
     if (!paymongoKey?.startsWith("sk_test_")) throw new Error("PAYMONGO_TEST_KEY_MISSING");
 
-    const siteUrl = (Deno.env.get("UNIVUE_SITE_URL") || "https://jester-penlza.github.io/Gr12-NUB/").replace(/\/?$/, "/");
-    const reference = encodeURIComponent(order.reference);
-    const checkoutResponse = await fetch("https://api.paymongo.com/v2/checkout_sessions", {
-      method: "POST",
-      headers: {
-        Authorization: `Basic ${btoa(`${paymongoKey}:`)}`,
-        "Content-Type": "application/json",
-        "Idempotency-Key": `univue-${order.id}`,
-      },
-      body: JSON.stringify({
-        data: {
-          attributes: {
-            line_items: items.map((item: Record<string, any>) => ({
-              name: `${item.products?.name || String(item.product_code).replaceAll("_", " ")} · ${item.size}`.slice(0, 120),
-              amount: Math.round(Number(item.unit_price) * 100),
-              currency: "PHP",
-              quantity: Number(item.quantity),
-            })),
-            payment_method_types: ["qrph"],
-            success_url: `${siteUrl}?payment=success&order=${reference}`,
-            cancel_url: `${siteUrl}?payment=cancelled&order=${reference}`,
-            reference_number: order.reference,
-            description: `UNIVUE NU Baliwag order ${order.reference}`,
-            show_description: true,
-            show_line_items: true,
-            send_email_receipt: false,
-            billing: {
-              name: String(order.customer_name).slice(0, 120),
-              phone: String(order.contact_number).slice(0, 40),
-            },
-            metadata: { order_id: order.id, system: "UNIVUE" },
+    const amount = Math.round(Number(order.total) * 100);
+    if (!Number.isSafeInteger(amount) || amount < 100) throw new Error("INVALID_ORDER_TOTAL");
+    const qrCycle = Math.floor(Date.now() / (qrLifetimeSeconds * 1000));
+    const stableKey = `${String(order.id).replaceAll("-", "")}-${qrCycle}`;
+    const intent = await paymongoPost("payment_intents", paymongoKey, {
+      data: {
+        attributes: {
+          amount,
+          currency: "PHP",
+          payment_method_allowed: ["qrph"],
+          description: `UNIVUE test order ${order.reference}`,
+          metadata: {
+            order_reference: order.reference,
+            order_id: order.id,
+            system: "UNIVUE",
+            environment: "simulation",
           },
         },
-      }),
-    });
-    const checkout = await checkoutResponse.json();
-    if (!checkoutResponse.ok) {
-      console.error("PayMongo checkout creation failed", checkoutResponse.status, checkout?.errors?.map((e: any) => e?.code));
-      return json(request, { error: "PAYMENT_PROVIDER_UNAVAILABLE" }, 502);
+      },
+    }, `univue-intent-${stableKey}`);
+
+    const method = await paymongoPost("payment_methods", paymongoKey, {
+      data: {
+        attributes: {
+          type: "qrph",
+          expiry_seconds: qrLifetimeSeconds,
+          billing: {
+            name: String(order.customer_name || "UNIVUE Demo").slice(0, 120),
+            email: "univue.demo@school.edu.ph",
+            phone: "09000000000",
+          },
+        },
+      },
+    }, `univue-method-${stableKey}`);
+
+    if (!/^pi_[A-Za-z0-9]+$/.test(intent?.id || "") || !/^pm_[A-Za-z0-9]+$/.test(method?.id || "")) {
+      throw new Error("INVALID_PAYMONGO_IDENTIFIERS");
+    }
+    const attached = await paymongoPost(`payment_intents/${intent.id}/attach`, paymongoKey, {
+      data: {
+        attributes: {
+          payment_method: method.id,
+          client_key: intent.attributes?.client_key,
+        },
+      },
+    }, `univue-attach-${stableKey}`);
+
+    const qrImageUrl = attached?.attributes?.next_action?.code?.image_url;
+    if (
+      attached?.id !== intent.id ||
+      attached?.attributes?.livemode !== false ||
+      attached?.attributes?.status !== "awaiting_next_action" ||
+      !isQrImage(qrImageUrl)
+    ) {
+      throw new Error("INVALID_PAYMONGO_QR_RESPONSE");
     }
 
-    const sessionId = checkout?.data?.id;
-    const checkoutUrl = checkout?.data?.attributes?.checkout_url;
-    if (!sessionId || !checkoutUrl?.startsWith("https://checkout.paymongo.com/")) {
-      throw new Error("INVALID_PAYMONGO_RESPONSE");
-    }
-
-    await supabaseRpc("attach_paymongo_checkout", {
+    const expiresAt = new Date(Date.now() + qrLifetimeSeconds * 1000).toISOString();
+    await supabaseRpc("attach_paymongo_qr", {
       p_order_id: order.id,
-      p_session_id: sessionId,
-      p_checkout_url: checkoutUrl,
+      p_payment_intent_id: intent.id,
+      p_payment_method_id: method.id,
+      p_qr_image: qrImageUrl,
+      p_expires_at: expiresAt,
     });
 
-    return json(request, { checkoutUrl, sessionId, reused: false });
+    return json(request, {
+      qrImageUrl,
+      paymentIntentId: intent.id,
+      expiresAt,
+      reused: false,
+      testMode: true,
+    });
   } catch (error) {
     console.error(error instanceof Error ? error.message : "UNKNOWN_CHECKOUT_ERROR");
     return json(request, { error: "CHECKOUT_CREATION_FAILED" }, 500);

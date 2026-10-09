@@ -87,8 +87,15 @@
       } catch { /* use the safe generic message */ }
       throw new Error(detail);
     }
-    if (!result.data?.checkoutUrl?.startsWith('https://checkout.paymongo.com/')) {
-      throw new Error('INVALID_PAYMENT_CHECKOUT');
+    const qrImageUrl = result.data?.qrImageUrl;
+    const expiresAt = Date.parse(result.data?.expiresAt || '');
+    if (
+      result.data?.testMode !== true ||
+      !/^data:image\/(?:png|svg\+xml);base64,/i.test(qrImageUrl || '') ||
+      !Number.isFinite(expiresAt) ||
+      expiresAt <= Date.now()
+    ) {
+      throw new Error('INVALID_PAYMENT_QR');
     }
     return result.data;
   }

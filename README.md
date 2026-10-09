@@ -52,7 +52,7 @@ Only users with an active row in `public.staff_profiles` can read orders, handle
 
 ## Checkout and payment behavior
 
-Placing an order rechecks and reserves stock in one database transaction. Cash remains `PENDING` until staff confirms it. Choosing GCash/QR Ph opens PayMongo Hosted Checkout V2, where PayMongo creates a one-time exact-amount QR. A signed `checkout_session.payment.paid` webhook confirms the database payment and creates the receipt automatically. UNIVUE never collects a card number, CVV, GCash PIN, or OTP.
+Placing an order rechecks and reserves stock in one database transaction. Cash remains `PENDING` until staff confirms it. Choosing the PayMongo simulation creates a QR Ph Payment Intent and displays PayMongo's actual short-lived test QR image inside UNIVUE for the exact order total. A signed `payment.paid` webhook confirms the database payment and creates the receipt automatically. The older `checkout_session.payment.paid` handler remains for already-created test sessions. UNIVUE never collects a card number, CVV, wallet PIN, or OTP.
 
 The PayMongo integration is currently configured with test credentials. Secrets are encrypted in Supabase Vault and are read only by the deployed Edge Functions. No PayMongo secret is stored in GitHub, browser code, or the Raspberry Pi frontend. Move to live mode only after a complete test checkout and webhook demonstration has passed and the school has approved the merchant account.
 

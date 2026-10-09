@@ -94,18 +94,42 @@ Deno.serve(async (request: Request) => {
     const payload = JSON.parse(rawBody);
     const event = payload?.data?.attributes;
     if (event?.livemode === true) return response({ error: "LIVE_EVENT_REJECTED" }, 400);
-    if (event?.type !== "checkout_session.payment.paid") return response({ received: true, ignored: true });
 
-    const session = event?.data;
-    const attributes = session?.attributes;
-    const payment = attributes?.payments?.find((entry: any) => entry?.attributes?.status === "paid");
-    const amount = Number(payment?.attributes?.amount);
-    if (!session?.id || !attributes?.reference_number || !payment?.id || !Number.isInteger(amount) || amount < 1) {
-      return response({ error: "INVALID_EVENT_PAYLOAD" }, 400);
+    if (event?.type === "payment.paid") {
+      const payment = event?.data;
+      const attributes = payment?.attributes;
+      const reference = attributes?.metadata?.order_reference;
+      const intentId = attributes?.payment_intent_id;
+      const amount = Number(attributes?.amount);
+      if (
+        attributes?.livemode === true ||
+        attributes?.status !== "paid" ||
+        !/^UNIVUE-[A-Z0-9-]{6,40}$/.test(String(reference || "")) ||
+        !/^pi_[A-Za-z0-9]+$/.test(String(intentId || "")) ||
+        !/^pay_[A-Za-z0-9]+$/.test(String(payment?.id || "")) ||
+        !Number.isInteger(amount) ||
+        amount < 1
+      ) {
+        return response({ error: "INVALID_EVENT_PAYLOAD" }, 400);
+      }
+      await confirmPayment(reference, intentId, payment.id, amount);
+      return response({ received: true });
     }
 
-    await confirmPayment(attributes.reference_number, session.id, payment.id, amount);
-    return response({ received: true });
+    // Retain compatibility with test checkout sessions generated before direct QR Ph was enabled.
+    if (event?.type === "checkout_session.payment.paid") {
+      const session = event?.data;
+      const attributes = session?.attributes;
+      const payment = attributes?.payments?.find((entry: any) => entry?.attributes?.status === "paid");
+      const amount = Number(payment?.attributes?.amount);
+      if (!session?.id || !attributes?.reference_number || !payment?.id || !Number.isInteger(amount) || amount < 1) {
+        return response({ error: "INVALID_EVENT_PAYLOAD" }, 400);
+      }
+      await confirmPayment(attributes.reference_number, session.id, payment.id, amount);
+      return response({ received: true });
+    }
+
+    return response({ received: true, ignored: true });
   } catch (error) {
     console.error(error instanceof Error ? error.message : "UNKNOWN_WEBHOOK_ERROR");
     return response({ error: "WEBHOOK_PROCESSING_FAILED" }, 500);

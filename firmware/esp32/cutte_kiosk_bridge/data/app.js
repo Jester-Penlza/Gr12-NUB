@@ -433,6 +433,7 @@ function friendlyError(error) {
   if (error.message === 'SUPABASE_UNAVAILABLE') return 'The UNIVUE database connection is unavailable.';
   if (error.message === 'STOCK_NOT_FOUND') return 'No inventory record exists for that item and size.';
   if (error.message === 'PAYMENT_SESSION_EXPIRED') return 'This secure payment session is no longer available. Ask staff to help with the reserved order.';
+  if (error.message === 'INVALID_PAYMENT_QR') return 'PayMongo did not return a valid test QR. Your order remains reserved; generate it again.';
   if (error.message.includes('PAYMENT') || error.message.includes('CHECKOUT')) return 'The secure QR payment page is temporarily unavailable. Your order remains reserved; retry when ready.';
   if (error.message.includes('INSUFFICIENT_STOCK')) return 'One or more items no longer have enough stock for this order.';
   if (error.message.includes('UNKNOWN_KIOSK')) return 'This kiosk is not registered in UNIVUE.';
@@ -581,6 +582,9 @@ function saveOrder(order) {
 }
 
 function renderOrderConfirmation(order, paymentMessage) {
+  clearInterval(renderPaymongoQr.expiryTimer);
+  byId('paymongo-qr-card').hidden = true;
+  byId('paymongo-qr-code').replaceChildren();
   state.lastOrderReference = order.reference;
   byId('order-reference').textContent = order.reference;
   byId('order-payment').textContent = paymentMessage || (order.paymentMethod === 'CASH'
@@ -594,6 +598,56 @@ function renderOrderConfirmation(order, paymentMessage) {
   showScreen('order-success');
 }
 
+function renderPaymongoQr(order, checkout) {
+  const qrImageUrl = checkout?.qrImageUrl || '';
+  const expiresAt = Date.parse(checkout?.expiresAt || '');
+  if (
+    checkout?.testMode !== true ||
+    !/^data:image\/(?:png|svg\+xml);base64,/i.test(qrImageUrl) ||
+    !Number.isFinite(expiresAt) ||
+    expiresAt <= Date.now()
+  ) {
+    throw new Error('INVALID_PAYMENT_QR');
+  }
+
+  const host = byId('paymongo-qr-code');
+  host.replaceChildren();
+  const image = new Image();
+  image.src = qrImageUrl;
+  image.alt = `PayMongo test QR for order ${order.reference}`;
+  image.width = 240;
+  image.height = 240;
+  host.append(image);
+  byId('paymongo-qr-total').textContent = currency.format(order.total);
+  const openQr = byId('paymongo-qr-open');
+  openQr.href = qrImageUrl;
+  openQr.removeAttribute('aria-disabled');
+  byId('paymongo-qr-card').hidden = false;
+  byId('retry-online-payment').hidden = true;
+  byId('order-payment').textContent = 'PayMongo QR Ph test image generated · simulation only';
+
+  const expiry = byId('paymongo-qr-expires');
+  clearInterval(renderPaymongoQr.expiryTimer);
+  const updateExpiry = () => {
+    const seconds = Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000));
+    if (seconds === 0) {
+      expiry.textContent = 'This test QR has expired. Generate a new one to continue the simulation.';
+      openQr.removeAttribute('href');
+      openQr.setAttribute('aria-disabled', 'true');
+      byId('retry-online-payment').hidden = false;
+      byId('retry-online-payment').disabled = false;
+      byId('retry-online-payment').textContent = 'Generate a new test QR';
+      clearInterval(renderPaymongoQr.expiryTimer);
+      return;
+    }
+    const minutes = Math.floor(seconds / 60);
+    const remainder = String(seconds % 60).padStart(2, '0');
+    expiry.textContent = `Expires in ${minutes}:${remainder}`;
+  };
+  updateExpiry();
+  renderPaymongoQr.expiryTimer = setInterval(updateExpiry, 1000);
+}
+
 function storePendingPayment(order) {
   sessionStorage.setItem(PENDING_PAYMENT_KEY, JSON.stringify({
     orderReference: order.reference,
@@ -604,12 +658,16 @@ function storePendingPayment(order) {
 async function retryOnlinePayment() {
   const button = byId('retry-online-payment');
   button.disabled = true;
-  button.textContent = 'Opening secure payment…';
+  button.textContent = 'Generating secure test QR…';
   try {
     const pending = JSON.parse(sessionStorage.getItem(PENDING_PAYMENT_KEY) || 'null');
     if (!pending?.orderReference || !pending?.accessToken) throw new Error('PAYMENT_SESSION_EXPIRED');
     const checkout = await DATA.createPaymongoCheckout(pending.orderReference, pending.accessToken);
-    window.location.assign(checkout.checkoutUrl);
+    const orders = JSON.parse(localStorage.getItem('cutte_orders') || '[]');
+    const order = Array.isArray(orders) ? orders.find((entry) => entry.reference === pending.orderReference) : null;
+    if (!order) throw new Error('PAYMENT_SESSION_EXPIRED');
+    renderOrderConfirmation(order);
+    renderPaymongoQr(order, checkout);
   } catch (error) {
     button.disabled = false;
     button.textContent = 'Retry secure QR payment';
@@ -663,13 +721,14 @@ async function placeOrder(event) {
     formElement.reset();
     if (LIVE_DATABASE_MODE && order.paymentMethod === 'GCASH') {
       storePendingPayment(order);
-      message.textContent = 'Order reserved. Opening PayMongo secure QR payment…';
+      message.textContent = 'Order reserved. Generating the PayMongo test QR…';
       try {
         const checkout = await DATA.createPaymongoCheckout(order.reference, order.accessToken);
-        window.location.assign(checkout.checkoutUrl);
+        renderOrderConfirmation(order);
+        renderPaymongoQr(order, checkout);
         return;
       } catch (paymentError) {
-        renderOrderConfirmation(order, 'QR payment page unavailable · order remains safely reserved');
+        renderOrderConfirmation(order, 'PayMongo test QR unavailable · order remains safely reserved');
         showToast(friendlyError(paymentError));
         return;
       }
