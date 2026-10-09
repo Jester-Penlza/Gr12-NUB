@@ -239,6 +239,7 @@ async function establishStaffSession() {
 
 byId('staff-login-form').addEventListener('submit', async (event) => {
   event.preventDefault();
+  const loginForm = event.currentTarget;
   const button = byId('staff-login-button');
   const errorHost = byId('staff-login-error');
   button.disabled = true;
@@ -247,7 +248,7 @@ byId('staff-login-form').addEventListener('submit', async (event) => {
     await DATA.signIn(byId('staff-email').value.trim(), byId('staff-password').value);
     state.profile = await DATA.getStaffProfile();
     if (!state.profile?.active) return showUnauthorized();
-    event.currentTarget.reset();
+    loginForm.reset();
     showDashboard();
     await refreshSnapshot();
     state.unsubscribe = DATA.subscribeStaff(scheduleRefresh);

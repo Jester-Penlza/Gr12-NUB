@@ -26,8 +26,12 @@ test('GitHub Pages build contains the UNIVUE kiosk, staff portal, and live Supab
   assert.match(app, /'\.\/images\/products\/male-polo\.png'/);
   assert.ok(fs.statSync(path.join(root, 'dist', 'images', 'branding', 'nu-shield.png')).size > 1_000_000);
   const staff = fs.readFileSync(path.join(root, 'dist', 'staff.html'), 'utf8');
+  const staffApp = fs.readFileSync(path.join(root, 'dist', 'staff.js'), 'utf8');
   assert.match(staff, /UNIVUE Staff/);
   assert.match(staff, /src="\.\/staff\.js"/);
   assert.match(staff, /href="\.\/staff\.css"/);
   assert.doesNotMatch(staff, /(?:src|href)="\/(?:images|styles\.css|staff\.css|staff\.js|supabase-config\.js|univue-data\.js)/);
+  assert.match(staffApp, /const loginForm = event\.currentTarget;/);
+  assert.match(staffApp, /loginForm\.reset\(\);/);
+  assert.doesNotMatch(staffApp, /await[\s\S]{0,500}event\.currentTarget\.reset\(\)/);
 });
